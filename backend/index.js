@@ -4,6 +4,11 @@ import cors from "cors";
 import dotenv from "dotenv";
 import postRoutes from "./routes/postRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
+import chatRoutes from "./routes/chatRoutes.js";
+import http from "http";
+import { Server } from "socket.io";
 
 // Load environment variables
 dotenv.config();
@@ -30,7 +35,50 @@ app.get("/", (req, res) => {
 // API Route mounting
 app.use("/api/posts", postRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/chats", chatRoutes);
 
-app.listen(PORT, () => {
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST"]
+  }
+});
+
+let onlineUsers = [];
+
+io.on("connection", (socket) => {
+  console.log("A user connected:", socket.id);
+
+  socket.on("addUser", (userId) => {
+    const existingUserIndex = onlineUsers.findIndex((u) => u.userId === userId);
+    if (existingUserIndex !== -1) {
+      onlineUsers[existingUserIndex].socketId = socket.id;
+    } else {
+      onlineUsers.push({ userId, socketId: socket.id });
+    }
+    io.emit("getUsers", onlineUsers);
+  });
+
+  socket.on("sendMessage", ({ senderId, receiverId, text }) => {
+    const user = onlineUsers.find((u) => u.userId === receiverId);
+    if (user) {
+      io.to(user.socketId).emit("getMessage", {
+        senderId,
+        text,
+      });
+    }
+  });
+
+  socket.on("disconnect", () => {
+    onlineUsers = onlineUsers.filter((u) => u.socketId !== socket.id);
+    io.emit("getUsers", onlineUsers);
+    console.log("User disconnected");
+  });
+});
+
+server.listen(PORT, () => {
   console.log(`Server running on port http://localhost:${PORT}`);
 });
