@@ -5,7 +5,10 @@ export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("token"));
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem("user");
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -22,6 +25,7 @@ export const AuthProvider = ({ children }) => {
    */
   const loginAuth = (newToken, userData) => {
     localStorage.setItem("token", newToken);
+    localStorage.setItem("user", JSON.stringify(userData));
     setToken(newToken);
     setUser(userData);
     navigate("/feed");
@@ -32,13 +36,23 @@ export const AuthProvider = ({ children }) => {
    */
   const logoutAuth = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("user");
     setToken(null);
     setUser(null);
     navigate("/");
   };
 
+  /**
+   * Update user details locally and in storage
+   */
+  const updateUser = (updatedData) => {
+    const newUser = { ...user, ...updatedData };
+    localStorage.setItem("user", JSON.stringify(newUser));
+    setUser(newUser);
+  };
+
   return (
-    <AuthContext.Provider value={{ token, user, loginAuth, logoutAuth }}>
+    <AuthContext.Provider value={{ token, user, loginAuth, logoutAuth, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
