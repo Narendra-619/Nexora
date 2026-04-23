@@ -1,4 +1,5 @@
 import User from "../models/User.js";
+import Notification from "../models/Notification.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
@@ -28,6 +29,14 @@ export const register = async (req, res) => {
     });
 
     await user.save();
+
+    // Create Welcome Notification
+    const welcomeNotification = new Notification({
+      recipient: user._id,
+      type: "welcome",
+      message: "Welcome to Nexora 🚀 Your space to connect, share moments, chat with friends, and express yourself. Start posting, reacting, and building your network today!"
+    });
+    await welcomeNotification.save();
 
     res.status(201).json({
       message: "User registered successfully",

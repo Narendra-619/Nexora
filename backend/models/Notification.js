@@ -8,18 +8,19 @@ const notificationSchema = new mongoose.Schema({
   },
   sender: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true
+    ref: "User"
   },
   type: {
     type: String,
-    enum: ["like", "comment"],
+    enum: ["like", "comment", "welcome"],
     required: true
   },
   post: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Post",
-    required: true
+    ref: "Post"
+  },
+  message: {
+    type: String
   },
   read: {
     type: Boolean,
