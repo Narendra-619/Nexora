@@ -47,8 +47,16 @@ export const updateUserProfile = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Update basic fields
-    if (username) user.username = username;
+    // Check if new username is already taken by someone else
+    if (username && username !== user.username) {
+      const existingUser = await User.findOne({ username });
+      if (existingUser) {
+        return res.status(400).json({ error: "Username is already taken" });
+      }
+      user.username = username;
+    }
+
+    // Update bio if provided
     if (bio !== undefined) user.bio = bio;
 
     // Handle profile picture update

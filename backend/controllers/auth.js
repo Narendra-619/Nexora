@@ -15,16 +15,22 @@ export const register = async (req, res) => {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    // Check for existing user
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
+    // Check for existing user by email
+    const emailExists = await User.findOne({ email: email.toLowerCase() });
+    if (emailExists) {
+      return res.status(400).json({ message: "Email is already registered" });
+    }
+
+    // Check for existing user by username
+    const usernameExists = await User.findOne({ username });
+    if (usernameExists) {
+      return res.status(400).json({ message: "Username is already taken" });
     }
 
     // Create and save new user (hashing happens in User model pre-save hook)
     const user = new User({
       username,
-      email,
+      email: email.toLowerCase(),
       password
     });
 
@@ -47,7 +53,8 @@ export const register = async (req, res) => {
     });
 
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Registration error:", error);
+    res.status(500).json({ message: "Server error during registration" });
   }
 };
 
@@ -67,7 +74,7 @@ export const login = async (req, res) => {
     }
 
     // Check if user exists
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
       return res.status(400).json({
         error: "No user found with this email"
