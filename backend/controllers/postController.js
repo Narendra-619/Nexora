@@ -32,8 +32,9 @@ export const createPost = async (req, res) => {
     });
 
   } catch (error) {
+    console.error("CREATE POST ERROR:", error);
     res.status(500).json({
-      error: "Server error"
+      error: error.message || "Server error"
     });
   }
 };
@@ -57,6 +58,7 @@ export const getPosts = async (req, res) => {
     res.status(200).json(posts);
 
   } catch (error) {
+    console.error("GET POSTS ERROR:", error);
     res.status(500).json({
       error: "Server error"
     });
@@ -80,6 +82,7 @@ export const searchPosts = async (req, res) => {
 
     res.status(200).json(posts);
   } catch (error) {
+    console.error("SEARCH POSTS ERROR:", error);
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -92,6 +95,7 @@ export const getPostById = async (req, res) => {
     if (!post) return res.status(404).json({ error: "Post not found" });
     res.status(200).json(post);
   } catch (err) {
+    console.error("GET POST BY ID ERROR:", err);
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -145,6 +149,7 @@ export const toggleLike = async (req, res) => {
     });
 
   } catch (error) {
+    console.error("TOGGLE LIKE ERROR:", error);
     res.status(500).json({
       error: "Server error"
     });
@@ -198,6 +203,7 @@ export const addComment = async (req, res) => {
     res.status(201).json({ message: "Comment added", comments: populatedPost.comments });
 
   } catch (error) {
+    console.error("ADD COMMENT ERROR:", error);
     res.status(500).json({
       error: "Server error"
     });
@@ -245,6 +251,7 @@ export const updatePost = async (req, res) => {
     });
 
   } catch (error) {
+    console.error("UPDATE POST ERROR:", error);
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -283,6 +290,7 @@ export const deletePost = async (req, res) => {
     });
 
   } catch (error) {
+    console.error("DELETE POST ERROR:", error);
     res.status(500).json({
       error: "Server error"
     });

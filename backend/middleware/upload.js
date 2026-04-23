@@ -15,13 +15,25 @@ const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: "social_app",
-    allowed_formats: ["jpg", "jpeg", "png"],
+    allowed_formats: ["jpg", "jpeg", "png", "webp", "gif"],
+    transformation: [{ width: 1200, crop: "limit" }] // Still optimization to save space/bandwidth
   },
 });
 
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith("image/")) {
+    cb(null, true);
+  } else {
+    cb(new Error("Invalid file type. Only images are allowed."), false);
+  }
+};
+
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB
+  fileFilter: fileFilter,
+  limits: { 
+    fileSize: 50 * 1024 * 1024 // 50MB limit
+  } 
 });
 
 const extractPublicId = (url) => {
