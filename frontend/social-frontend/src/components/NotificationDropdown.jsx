@@ -88,10 +88,8 @@ export default function NotificationDropdown() {
               </div>
             ) : (
               notifications.map(n => (
-                <Link 
+                <div 
                   key={n._id} 
-                  to={`/post/${n.post?._id}`}
-                  onClick={() => setIsOpen(false)}
                   className={`flex gap-3 p-4 border-b last:border-0 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all group ${!n.read ? 'bg-blue-50/30 dark:bg-blue-900/5' : ''}`}
                 >
                   <div className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 overflow-hidden flex-shrink-0 group-hover:border-blue-500 transition-all">
@@ -99,17 +97,26 @@ export default function NotificationDropdown() {
                       <img src={n.sender.profilePicture} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs bg-blue-50 dark:bg-zinc-900">
-                        {n.sender?.username?.charAt(0).toUpperCase()}
+                        {n.type === 'welcome' ? '🚀' : (n.sender?.username?.charAt(0).toUpperCase() || '?')}
                       </div>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-zinc-800 dark:text-zinc-200 leading-snug">
-                      <span className="font-black text-zinc-900 dark:text-white">{n.sender?.username}</span> 
-                      <span className="ml-1 text-zinc-600 dark:text-zinc-400">
-                        {n.type === 'like' ? 'liked your post' : 'commented on your post'}
-                      </span>
-                    </p>
+                    {n.type === 'welcome' ? (
+                      <div className="text-sm">
+                         <span className="font-black text-zinc-900 dark:text-white">Nexora Welcome</span>
+                         <p className="text-zinc-600 dark:text-zinc-400 mt-0.5 leading-snug">{n.message}</p>
+                      </div>
+                    ) : (
+                      <Link to={`/post/${n.post?._id}`} onClick={() => setIsOpen(false)}>
+                        <p className="text-sm text-zinc-800 dark:text-zinc-200 leading-snug">
+                          <span className="font-black text-zinc-900 dark:text-white">{n.sender?.username}</span> 
+                          <span className="ml-1 text-zinc-600 dark:text-zinc-400">
+                            {n.type === 'like' ? 'liked your post' : 'commented on your post'}
+                          </span>
+                        </p>
+                      </Link>
+                    )}
                     <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-600 mt-1 uppercase tracking-tighter">
                       {new Date(n.createdAt).toLocaleDateString()}
                     </p>
@@ -117,7 +124,7 @@ export default function NotificationDropdown() {
                   {!n.read && (
                     <div className="w-2 h-2 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></div>
                   )}
-                </Link>
+                </div>
               ))
             )}
           </div>
