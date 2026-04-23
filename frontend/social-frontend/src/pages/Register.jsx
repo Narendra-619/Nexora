@@ -80,7 +80,7 @@ export default function Register() {
                 type="password"
                 required
                 className="input-field"
-                placeholder="Min. 6 characters"
+                placeholder="Min. 8 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
