@@ -108,11 +108,11 @@ export default function NotificationDropdown() {
                          <p className="text-zinc-600 dark:text-zinc-400 mt-0.5 leading-snug">{n.message}</p>
                       </div>
                     ) : (
-                      <Link to={`/post/${n.post?._id}`} onClick={() => setIsOpen(false)}>
+                      <Link to={n.post?._id ? `/post/${n.post._id}` : '#'} onClick={() => setIsOpen(false)}>
                         <p className="text-sm text-zinc-800 dark:text-zinc-200 leading-snug">
-                          <span className="font-black text-zinc-900 dark:text-white">{n.sender?.username}</span> 
+                          <span className="font-black text-zinc-900 dark:text-white">{n.sender?.username || "Unknown"}</span> 
                           <span className="ml-1 text-zinc-600 dark:text-zinc-400">
-                            {n.type === 'like' ? 'liked your post' : 'commented on your post'}
+                            {n.type === 'like' ? 'liked your post' : n.type === 'comment' ? 'commented on your post' : `sent a ${n.type} notification`}
                           </span>
                         </p>
                       </Link>
