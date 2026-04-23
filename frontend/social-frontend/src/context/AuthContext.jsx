@@ -9,6 +9,7 @@ export const AuthProvider = ({ children }) => {
     const savedUser = localStorage.getItem("user");
     return savedUser ? JSON.parse(savedUser) : null;
   });
+  const [showWelcome, setShowWelcome] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,13 +24,21 @@ export const AuthProvider = ({ children }) => {
   /**
    * Handle user login: stores token and navigates to the feed
    */
-  const loginAuth = (newToken, userData) => {
+  const loginAuth = (newToken, userData, isNew = false) => {
     localStorage.setItem("token", newToken);
     localStorage.setItem("user", JSON.stringify(userData));
     setToken(newToken);
     setUser(userData);
+    if (isNew) {
+      setShowWelcome(true);
+    }
     navigate("/feed");
   };
+
+  /**
+   * Close the welcome modal
+   */
+  const closeWelcome = () => setShowWelcome(false);
 
   /**
    * Handle user logout: clears authorization state and redirects
@@ -52,7 +61,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ token, user, loginAuth, logoutAuth, updateUser }}>
+    <AuthContext.Provider value={{ token, user, loginAuth, logoutAuth, updateUser, showWelcome, closeWelcome }}>
       {children}
     </AuthContext.Provider>
   );

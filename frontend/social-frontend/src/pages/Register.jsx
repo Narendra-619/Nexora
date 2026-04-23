@@ -18,11 +18,11 @@ export default function Register() {
     try {
       setError("");
       // Register
-      const res = await API.post("/auth/register", { username, email, password });
+      await API.post("/auth/register", { username, email, password });
       
       // Auto-login after registration
       const loginRes = await API.post("/auth/login", { email, password });
-      loginAuth(loginRes.data.token, loginRes.data.user);
+      loginAuth(loginRes.data.token, loginRes.data.user, true);
     } catch (err) {
       setError(err.response?.data?.message || err.response?.data?.error || "Registration failed");
     } finally {
