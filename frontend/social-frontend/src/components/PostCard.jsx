@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import API from "../utils/api";
 import CommentSection from "./CommentSection";
 import { AuthContext } from "../context/AuthContext";
+import ConfirmModal from "./ConfirmModal";
 
 const PostCard = memo(({ post, onPostDelete, onPostUpdate }) => {
   const { user } = useContext(AuthContext);
@@ -18,17 +19,21 @@ const PostCard = memo(({ post, onPostDelete, onPostUpdate }) => {
   const [editText, setEditText] = useState(post.text || "");
   const [editImageFile, setEditImageFile] = useState(null);
   const [previewImage, setPreviewImage] = useState(post.image || "");
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const fileInputRef = useRef(null);
 
-  const handleDelete = async () => {
-    if (!window.confirm("Are you sure you want to delete this post?")) return;
+  const handleDelete = () => {
+    setIsDeleteModalOpen(true);
+    setShowDropdown(false);
+  };
+
+  const confirmDelete = async () => {
     try {
       await API.delete(`/posts/${post._id}`);
       if (onPostDelete) onPostDelete();
     } catch (err) {
       console.error("Failed to delete post");
     }
-    setShowDropdown(false);
   };
 
   const handleEditSubmit = async () => {
@@ -289,6 +294,15 @@ const PostCard = memo(({ post, onPostDelete, onPostUpdate }) => {
           <CommentSection post={post} onCommentAdded={(newCount) => setCommentCount(newCount)} />
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal 
+        isOpen={isDeleteModalOpen} 
+        onClose={() => setIsDeleteModalOpen(false)} 
+        onConfirm={confirmDelete}
+        title="Delete Post?"
+        message="Are you sure you want to delete this post? This action cannot be undone."
+      />
     </div>
   );
 });
