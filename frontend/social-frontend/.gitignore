@@ -23,8 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
-Social App Credentials.txt
-README.md
+SocialAppCredentials.txt
+
 .env
-.gitignore
+
 .env.example
