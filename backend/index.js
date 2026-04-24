@@ -21,6 +21,7 @@ app.use(cors({
   origin: process.env.CLIENT_URL,
   credentials: true
 }));
+
 // Increase payload limit for Base64 image uploads
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -41,6 +42,15 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/chats", chatRoutes);
+
+// Global Error Handler (Specifically handles Multer errors)
+app.use((err, req, res, next) => {
+  console.error("GLOBAL ERROR:", err);
+  if (err.name === 'MulterError' || err.message.includes('file type')) {
+    return res.status(400).json({ error: err.message });
+  }
+  res.status(500).json({ error: "Internal Server Error" });
+});
 
 const server = http.createServer(app);
 const io = new Server(server, {

@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+Social App Credentials.txt
+README.md
+.env
+.gitignore
+.env.example
