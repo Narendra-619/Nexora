@@ -32,14 +32,14 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-[90vh] flex items-center justify-center p-4">
+    <div className="min-h-[calc(100vh-4.5rem)] flex justify-center px-4 pt-6 sm:pt-10 pb-12">
       <div className="w-full max-w-[400px] fade-in">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl overflow-hidden mx-auto mb-4 shadow-xl shadow-blue-500/20 rotate-3 transition-transform hover:rotate-0">
+        <div className="text-center mb-6">
+          <div className="w-12 h-12 rounded-2xl overflow-hidden mx-auto mb-3 shadow-sm">
             <img src="/logo.png" alt="logo" className="w-full h-full object-cover" />
           </div>
-          <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">Forgot Password?</h2>
-          <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">Enter your email to receive a reset code</p>
+          <h2 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">Forgot Password?</h2>
+          <p className="text-gray-500 dark:text-gray-400 mt-1.5 text-sm font-medium">Enter your email to receive a reset code</p>
         </div>
 
         <div className="card p-8">

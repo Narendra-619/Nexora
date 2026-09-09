@@ -38,26 +38,26 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-[calc(100vh-4.5rem)] flex justify-center px-4 pt-6 sm:pt-10 pb-12 relative overflow-hidden">
       {/* Background — clean, minimal */}
       <div className="absolute inset-0 bg-zinc-50 dark:bg-black" />
 
       <div className="w-full max-w-[380px] relative z-10 slide-up">
         {/* Logo */}
-        <div className="text-center mb-10">
-          <div className="w-14 h-14 rounded-2xl overflow-hidden mx-auto mb-5">
+        <div className="text-center mb-6">
+          <div className="w-12 h-12 rounded-2xl overflow-hidden mx-auto mb-3 shadow-sm">
             <img src="/logo.png" alt="Nexora" className="w-full h-full object-cover" />
           </div>
-          <h1 className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">
             Welcome back
           </h1>
-          <p className="text-zinc-500 dark:text-zinc-400 mt-2 text-sm">
+          <p className="text-zinc-500 dark:text-zinc-400 mt-1 text-sm">
             Log in to continue to Nexora
           </p>
         </div>
 
         {/* Card — glass, no shadow */}
-        <div className="glass rounded-3xl p-8">
+        <div className="glass rounded-3xl p-6 sm:p-8">
           {error && (
             <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 p-4 mb-6 rounded-2xl flex items-center gap-3 animate-shake">
               <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center flex-shrink-0">
