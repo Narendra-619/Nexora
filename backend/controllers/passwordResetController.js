@@ -39,7 +39,7 @@ export const requestReset = async (req, res) => {
     } catch (mailErr) {
       console.error("Failed to send OTP email:", mailErr.message);
       return res.status(500).json({
-        error: "Failed to send reset code email. Please ensure EMAIL_USER and EMAIL_PASS are set in backend environment variables."
+        error: `Failed to send reset code: ${mailErr.message || "Email delivery failed"}`
       });
     }
 
