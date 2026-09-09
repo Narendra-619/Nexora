@@ -1,14 +1,20 @@
 import nodemailer from "nodemailer";
 
 const getTransporter = () => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+  const user = process.env.EMAIL_USER?.trim();
+  const pass = process.env.EMAIL_PASS?.replace(/\s+/g, "");
+
+  if (!user || !pass) {
     return null;
   }
   return nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    requireTLS: true,
+    auth: { user, pass },
+    tls: {
+      rejectUnauthorized: false
     },
     connectionTimeout: 8000,
     greetingTimeout: 8000,
@@ -20,9 +26,9 @@ const transporter = getTransporter();
 
 if (transporter) {
   transporter.verify().then(() => {
-    console.log("Email transporter verified");
+    console.log("Email transporter verified successfully on port 587");
   }).catch((err) => {
-    console.error("Email transporter verification failed:", err.message);
+    console.error("Email transporter verification failed on port 587:", err.message);
   });
 } else {
   console.warn("[WARN] EMAIL_USER or EMAIL_PASS not configured in environment.");
@@ -69,22 +75,8 @@ const sendMailWithFallback = async (mailOptions) => {
     throw new Error(`Email credentials missing on server (${missing.join(", ")}). Please add them to your Render Dashboard Environment Variables.`);
   }
 
-  // 1. Try Port 465 (SSL)
+  // 1. Primary: Port 587 (STARTTLS) - standard for cloud hosts like Render
   try {
-    const transporter465 = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 465,
-      secure: true,
-      auth: { user, pass },
-      connectionTimeout: 8000,
-      greetingTimeout: 8000,
-      socketTimeout: 10000,
-    });
-    return await transporter465.sendMail({ from: `"Nexora" <${user}>`, ...mailOptions });
-  } catch (err465) {
-    console.warn(`[Email] Port 465 attempt failed (${err465.message}). Retrying via port 587 (STARTTLS)...`);
-
-    // 2. Fallback to Port 587 (STARTTLS)
     const transporter587 = nodemailer.createTransport({
       host: "smtp.gmail.com",
       port: 587,
@@ -99,6 +91,20 @@ const sendMailWithFallback = async (mailOptions) => {
       socketTimeout: 10000,
     });
     return await transporter587.sendMail({ from: `"Nexora" <${user}>`, ...mailOptions });
+  } catch (err587) {
+    console.warn(`[Email] Port 587 attempt failed (${err587.message}). Trying fallback via port 465...`);
+
+    // 2. Fallback: Port 465 (SSL)
+    const transporter465 = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: { user, pass },
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 10000,
+    });
+    return await transporter465.sendMail({ from: `"Nexora" <${user}>`, ...mailOptions });
   }
 };
 
