@@ -101,7 +101,8 @@ export default function Feed() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto py-10 px-4 sm:px-0">
+    <div className="max-w-2xl mx-auto lg:-translate-x-10 py-10 px-4 sm:px-0">
+
       <div className="fade-in">
         <CreatePost refresh={handleRefresh} />
       </div>
