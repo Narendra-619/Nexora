@@ -42,8 +42,9 @@ const Navbar = () => {
       return;
     }
 
+    setIsSearching(true);
+
     const delayDebounceFn = setTimeout(async () => {
-      setIsSearching(true);
       try {
         const [usersRes, postsRes] = await Promise.all([
           API.get(`/users/search?q=${searchQuery}`),
@@ -58,13 +59,31 @@ const Navbar = () => {
       } finally {
         setIsSearching(false);
       }
-    }, 400);
+    }, 350);
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
 
   const renderSearchResults = () => {
     if (!searchQuery.trim()) return null;
+
+    if (isSearching) {
+      return (
+        <div className="p-3 space-y-3">
+          <div className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-2">Searching...</div>
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center gap-3 p-2 rounded-xl animate-pulse">
+              <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3.5 bg-zinc-200 dark:bg-zinc-800 rounded-md w-1/3" />
+                <div className="h-2.5 bg-zinc-100 dark:bg-zinc-800/60 rounded-md w-1/4" />
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
     return (
       <div className="max-h-[60vh] overflow-y-auto p-2">
         {searchResults.users.length > 0 && (

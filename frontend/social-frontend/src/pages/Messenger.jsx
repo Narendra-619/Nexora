@@ -207,10 +207,11 @@ export default function Messenger() {
     clearTimeout(searchTimeout.current);
     if (!query.trim()) {
       setSearchResults([]);
+      setSearching(false);
       return;
     }
+    setSearching(true);
     searchTimeout.current = setTimeout(async () => {
-      setSearching(true);
       try {
         const res = await API.get(`/users/search?q=${encodeURIComponent(query)}`);
         const myId = (user._id || user.id)?.toString();
@@ -220,7 +221,7 @@ export default function Messenger() {
       } finally {
         setSearching(false);
       }
-    }, 400);
+    }, 350);
   };
 
   const handleStartChat = (targetUser) => {
@@ -573,10 +574,18 @@ export default function Messenger() {
                 className="input-field pl-10 w-full"
               />
             </div>
-            <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+            <div className="max-h-[300px] overflow-y-auto custom-scrollbar p-1">
               {searching && (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-zinc-200 dark:border-zinc-700 border-t-blue-600"></div>
+                <div className="space-y-2 p-1">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-3 p-2.5 rounded-xl animate-pulse">
+                      <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0" />
+                      <div className="flex-1 space-y-1.5">
+                        <div className="h-3.5 bg-zinc-200 dark:bg-zinc-800 rounded-md w-28" />
+                        <div className="h-2.5 bg-zinc-100 dark:bg-zinc-800/60 rounded-md w-16" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
               {!searching && searchQuery && searchResults.length === 0 && (
