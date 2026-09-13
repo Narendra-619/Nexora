@@ -115,22 +115,30 @@ pipeline {
 
         stage('Commit & Push Manifests') {
             steps {
-                sh '''
-                    git config user.email "jenkins@ci.com"
-                    git config user.name "Jenkins"
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'github-creds',
+                        usernameVariable: 'GIT_USERNAME',
+                        passwordVariable: 'GIT_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        git config user.email "jenkins@ci.com"
+                        git config user.name "Jenkins"
 
-                    git add manifests/deployments/backend-deploy.yaml
-                    git add manifests/deployments/frontend-deploy.yaml
+                        git add manifests/deployments/backend-deploy.yaml
+                        git add manifests/deployments/frontend-deploy.yaml
 
-                    if git diff --cached --quiet; then
-                        echo "No manifest changes to commit."
-                    else
-                        git commit \
-                          -m "ci: update image tags to build ${IMAGE_TAG} [skip ci]"
+                        if git diff --cached --quiet; then
+                            echo "No manifest changes to commit."
+                        else
+                            git commit \
+                              -m "ci: update image tags to build ${IMAGE_TAG} [skip ci]"
 
-                        git push origin HEAD:main
-                    fi
-                '''
+                            git push https://${GIT_USERNAME}:${GIT_TOKEN}@github.com/Narendra-619/Nexora.git HEAD:main
+                        fi
+                    '''
+                }
             }
         }
     }
@@ -182,4 +190,3 @@ pipeline {
         }
     }
 }
-
