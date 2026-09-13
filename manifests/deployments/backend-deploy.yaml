@@ -1,26 +1,39 @@
 apiVersion: apps/v1
 kind: Deployment
+
 metadata:
-  labels:
-    app: nexora-backend
   name: nexora-backend
   namespace: nexora
+  labels:
+    app: nexora-backend
+
 spec:
   replicas: 2
+
   selector:
     matchLabels:
       app: nexora-backend
+
   strategy: {}
+
   template:
     metadata:
       labels:
         app: nexora-backend
+
     spec:
       containers:
-      - image: 276096488420.dkr.ecr.ap-south-1.amazonaws.com/nexora/backend:v1
-        name: backend
-        resources: {}
-        envFrom:
-          - secretRef:
-              name: nexora-backend-secrets
-status: {}
+        - name: backend
+          image: 276096488420.dkr.ecr.ap-south-1.amazonaws.com/nexora/backend:v1
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+          envFrom:
+            - secretRef:
+                name: nexora-backend-secrets

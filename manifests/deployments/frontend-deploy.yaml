@@ -1,23 +1,35 @@
 apiVersion: apps/v1
 kind: Deployment
+
 metadata:
-  labels:
-    app: nexora-frontend
   name: nexora-frontend
   namespace: nexora
+  labels:
+    app: nexora-frontend
+
 spec:
   replicas: 2
+
   selector:
     matchLabels:
       app: nexora-frontend
+
   strategy: {}
+
   template:
     metadata:
       labels:
         app: nexora-frontend
+
     spec:
       containers:
-      - image: 276096488420.dkr.ecr.ap-south-1.amazonaws.com/nexora/frontend:v5
-        name: frontend
-        resources: {}
-status: {}
+        - name: frontend
+          image: 276096488420.dkr.ecr.ap-south-1.amazonaws.com/nexora/frontend:v5
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"

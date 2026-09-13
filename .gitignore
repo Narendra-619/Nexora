@@ -3,7 +3,7 @@ node_modules
 .env.local
 SocialAppCredentials.txt
 /manifests/deployments/secrets.yaml
-
+/manifests/hpa/secrets.yaml
 .terraform/
 *.tfstate
 *.tfstate.*
