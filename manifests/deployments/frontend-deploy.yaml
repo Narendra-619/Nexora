@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: 276096488420.dkr.ecr.ap-south-1.amazonaws.com/nexora/frontend:28
+          image: 276096488420.dkr.ecr.ap-south-1.amazonaws.com/nexora/frontend:29
 
           resources:
             requests:
