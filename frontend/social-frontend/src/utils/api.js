@@ -4,7 +4,9 @@ const rawBaseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
 const cleanBaseUrl = rawBaseUrl.replace(/\/+$/, "");
 
 const API = axios.create({
-  baseURL: `${cleanBaseUrl}/api`
+  baseURL: cleanBaseUrl.endsWith("/api")
+    ? cleanBaseUrl
+    : `${cleanBaseUrl}/api`
 });
 
 API.interceptors.request.use((req) => {
