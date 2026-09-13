@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -24,20 +25,26 @@ pipeline {
                 sh '''
                     echo "Running basic project checks..."
 
+                    # Check project directories
                     test -d backend
                     test -d frontend
+                    test -d frontend/social-frontend
 
+                    # Check Dockerfiles
                     test -f backend/Dockerfile
-                    test -f frontend/Dockerfile
+                    test -f frontend/social-frontend/Dockerfile
 
+                    # Check Kubernetes manifests
                     test -f manifests/deployments/backend-deployment.yaml
                     test -f manifests/deployments/frontend-deployment.yaml
 
                     echo "✓ Project structure check passed"
 
+                    # Check backend manifest
                     grep -q "nexora/backend" \
                         manifests/deployments/backend-deployment.yaml
 
+                    # Check frontend manifest
                     grep -q "nexora/frontend" \
                         manifests/deployments/frontend-deployment.yaml
 
@@ -75,7 +82,7 @@ pipeline {
                     docker build \
                       --build-arg VITE_API_URL=/api \
                       -t ${FRONTEND_REPO}:${IMAGE_TAG} \
-                      ./frontend
+                      ./frontend/social-frontend
 
                     docker push ${FRONTEND_REPO}:${IMAGE_TAG}
                 '''
@@ -157,3 +164,4 @@ pipeline {
         }
     }
 }
+
