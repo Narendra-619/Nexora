@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: 276096488420.dkr.ecr.ap-south-1.amazonaws.com/nexora/backend:29
+          image: 276096488420.dkr.ecr.ap-south-1.amazonaws.com/nexora/backend:30
 
           resources:
             requests:
