@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -14,31 +13,47 @@ pipeline {
 
     stages {
 
+        stage('Prevent CI Loop') {
+            steps {
+                script {
+                    def commitMessage = sh(
+                        script: 'git log -1 --pretty=%B',
+                        returnStdout: true
+                    ).trim()
+
+                    echo "Latest commit: ${commitMessage}"
+
+                    if (commitMessage.startsWith("ci: update image tags")) {
+                        echo "Jenkins-generated manifest commit detected."
+                        echo "Skipping this build to prevent CI loop."
+
+                        currentBuild.result = 'NOT_BUILT'
+                        error("Skipping Jenkins-generated commit")
+                    }
+                }
+            }
+        }
+
         stage('Basic Tests') {
             steps {
                 sh '''
                     echo "Running basic project checks..."
 
-                    # Check project directories
                     test -d backend
                     test -d frontend
                     test -d frontend/social-frontend
 
-                    # Check Dockerfiles
                     test -f backend/Dockerfile
                     test -f frontend/social-frontend/Dockerfile
 
-                    # Check Kubernetes deployment manifests
                     test -f manifests/deployments/backend-deploy.yaml
                     test -f manifests/deployments/frontend-deploy.yaml
 
                     echo "✓ Project structure check passed"
 
-                    # Check backend manifest
                     grep -q "nexora/backend" \
                         manifests/deployments/backend-deploy.yaml
 
-                    # Check frontend manifest
                     grep -q "nexora/frontend" \
                         manifests/deployments/frontend-deploy.yaml
 
