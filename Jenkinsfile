@@ -128,7 +128,7 @@ pipeline {
                         git commit \
                           -m "ci: update image tags to build ${IMAGE_TAG} [skip ci]"
 
-                        git push origin main
+                        git push origin HEAD:main
                     fi
                 '''
             }
