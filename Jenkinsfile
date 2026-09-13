@@ -14,12 +14,6 @@ pipeline {
 
     stages {
 
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
         stage('Basic Tests') {
             steps {
                 sh '''
@@ -34,19 +28,19 @@ pipeline {
                     test -f backend/Dockerfile
                     test -f frontend/social-frontend/Dockerfile
 
-                    # Check Kubernetes manifests
-                    test -f manifests/deployments/backend-deployment.yaml
-                    test -f manifests/deployments/frontend-deployment.yaml
+                    # Check Kubernetes deployment manifests
+                    test -f manifests/deployments/backend-deploy.yaml
+                    test -f manifests/deployments/frontend-deploy.yaml
 
                     echo "✓ Project structure check passed"
 
                     # Check backend manifest
                     grep -q "nexora/backend" \
-                        manifests/deployments/backend-deployment.yaml
+                        manifests/deployments/backend-deploy.yaml
 
                     # Check frontend manifest
                     grep -q "nexora/frontend" \
-                        manifests/deployments/frontend-deployment.yaml
+                        manifests/deployments/frontend-deploy.yaml
 
                     echo "✓ Kubernetes manifest check passed"
 
@@ -67,9 +61,13 @@ pipeline {
         stage('Build & Push Backend') {
             steps {
                 sh '''
+                    echo "Building backend image..."
+
                     docker build \
                       -t ${BACKEND_REPO}:${IMAGE_TAG} \
                       ./backend
+
+                    echo "Pushing backend image..."
 
                     docker push ${BACKEND_REPO}:${IMAGE_TAG}
                 '''
@@ -79,10 +77,14 @@ pipeline {
         stage('Build & Push Frontend') {
             steps {
                 sh '''
+                    echo "Building frontend image..."
+
                     docker build \
                       --build-arg VITE_API_URL=/api \
                       -t ${FRONTEND_REPO}:${IMAGE_TAG} \
                       ./frontend/social-frontend
+
+                    echo "Pushing frontend image..."
 
                     docker push ${FRONTEND_REPO}:${IMAGE_TAG}
                 '''
@@ -92,17 +94,21 @@ pipeline {
         stage('Update Manifests') {
             steps {
                 sh '''
+                    echo "Updating Kubernetes image tags..."
+
                     sed -i "s|image:.*nexora/backend.*|image: ${BACKEND_REPO}:${IMAGE_TAG}|" \
-                      manifests/deployments/backend-deployment.yaml
+                      manifests/deployments/backend-deploy.yaml
 
                     sed -i "s|image:.*nexora/frontend.*|image: ${FRONTEND_REPO}:${IMAGE_TAG}|" \
-                      manifests/deployments/frontend-deployment.yaml
+                      manifests/deployments/frontend-deploy.yaml
 
-                    echo "Updated backend image to:"
-                    grep "image:" manifests/deployments/backend-deployment.yaml
+                    echo ""
+                    echo "Updated backend image:"
+                    grep "image:" manifests/deployments/backend-deploy.yaml
 
-                    echo "Updated frontend image to:"
-                    grep "image:" manifests/deployments/frontend-deployment.yaml
+                    echo ""
+                    echo "Updated frontend image:"
+                    grep "image:" manifests/deployments/frontend-deploy.yaml
                 '''
             }
         }
@@ -113,24 +119,30 @@ pipeline {
                     git config user.email "jenkins@ci.com"
                     git config user.name "Jenkins"
 
-                    git add manifests/deployments/backend-deployment.yaml
-                    git add manifests/deployments/frontend-deployment.yaml
+                    git add manifests/deployments/backend-deploy.yaml
+                    git add manifests/deployments/frontend-deploy.yaml
 
-                    git diff --cached --quiet || \
-                    git commit -m "ci: update image tags to build ${IMAGE_TAG} [skip ci]"
+                    if git diff --cached --quiet; then
+                        echo "No manifest changes to commit."
+                    else
+                        git commit \
+                          -m "ci: update image tags to build ${IMAGE_TAG} [skip ci]"
 
-                    git push origin main
+                        git push origin main
+                    fi
                 '''
             }
         }
     }
 
     post {
+
         success {
             echo """
             ==========================================
                     NEXORA PIPELINE SUCCESS
             ==========================================
+
             Build: ${BUILD_NUMBER}
 
             Backend Image:
@@ -139,9 +151,13 @@ pipeline {
             Frontend Image:
             ${FRONTEND_REPO}:${IMAGE_TAG}
 
-            Images pushed to ECR successfully.
-            Kubernetes manifests updated.
-            ArgoCD will synchronize the changes.
+            ✓ Tests passed
+            ✓ Images built
+            ✓ Images pushed to ECR
+            ✓ Kubernetes manifests updated
+            ✓ GitHub updated
+            ✓ ArgoCD will synchronize the changes
+
             ==========================================
             """
         }
@@ -151,10 +167,12 @@ pipeline {
             ==========================================
                     NEXORA PIPELINE FAILED
             ==========================================
+
             Build: ${BUILD_NUMBER}
 
             Check the failed stage above
             for the exact error.
+
             ==========================================
             """
         }
