@@ -18,11 +18,20 @@ const messageSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
+  },
+  read: {
+    type: Boolean,
+    default: false
+  },
+  readAt: {
+    type: Date,
+    default: null
   }
 });
 
 messageSchema.index({ conversationId: 1 });
 messageSchema.index({ conversationId: 1, createdAt: 1 });
+messageSchema.index({ conversationId: 1, sender: 1, read: 1 });
 
 const Message = mongoose.model("Message", messageSchema);
 export default Message;

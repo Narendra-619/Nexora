@@ -1,9 +1,11 @@
 import { useContext, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
+import { ChatContext } from "../context/ChatContext";
 
 const BottomNav = () => {
   const { user } = useContext(AuthContext);
+  const { unreadCount } = useContext(ChatContext);
   const location = useLocation();
   const navigate = useNavigate();
   const [showCreateMenu, setShowCreateMenu] = useState(false);
@@ -27,9 +29,16 @@ const BottomNav = () => {
       to: "/messenger",
       label: "Messages",
       icon: (active) => (
-        <svg className={`w-6 h-6 ${active ? "text-blue-600" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? "2.5" : "2"} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-        </svg>
+        <div className="relative">
+          <svg className={`w-6 h-6 ${active ? "text-blue-600" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? "2.5" : "2"} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white px-1 shadow-sm ring-2 ring-white dark:ring-zinc-900">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
+        </div>
       )
     },
     {

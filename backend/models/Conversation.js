@@ -12,7 +12,8 @@ const conversationSchema = new mongoose.Schema({
   lastMessage: {
     text: String,
     sender: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    read: { type: Boolean, default: false }
   },
   updatedAt: {
     type: Date,

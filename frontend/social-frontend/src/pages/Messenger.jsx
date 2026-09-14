@@ -1,8 +1,8 @@
 import { useState, useEffect, useContext, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
+import { ChatContext } from "../context/ChatContext";
 import API from "../utils/api";
-import { io } from "socket.io-client";
 import ConversationItem from "../components/ConversationItem";
 import ChatBox from "../components/ChatBox";
 import EmojiPicker from "../components/EmojiPicker";
@@ -29,6 +29,15 @@ function shouldShowDateSeparator(messages, index) {
 
 export default function Messenger() {
   const { user } = useContext(AuthContext);
+  const {
+    unreadPerConversation,
+    markConversationAsRead,
+    setActiveConversationId,
+    lastReadReceipt,
+    onlineUsers: globalOnlineUsers,
+    socketRef
+  } = useContext(ChatContext);
+
   const [conversations, setConversations] = useState([]);
   const [currentChat, setCurrentChat] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -44,14 +53,29 @@ export default function Messenger() {
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [sending, setSending] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [unreadMessageIds, setUnreadMessageIds] = useState(new Set());
+
   const location = useLocation();
-  const socket = useRef();
   const conversationsRef = useRef([]);
   const messagesEndRef = useRef();
   const messagesContainerRef = useRef();
   const messageInputRef = useRef();
   const searchTimeout = useRef();
   const currentChatRef = useRef(currentChat);
+  const unreadTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (globalOnlineUsers) {
+      setOnlineUsers(globalOnlineUsers);
+    }
+  }, [globalOnlineUsers]);
+
+  useEffect(() => {
+    setActiveConversationId(currentChat?._id || null);
+    return () => {
+      setActiveConversationId(null);
+    };
+  }, [currentChat?._id, setActiveConversationId]);
 
   useEffect(() => {
     currentChatRef.current = currentChat;
@@ -59,28 +83,23 @@ export default function Messenger() {
   }, [currentChat]);
 
   useEffect(() => {
-    const rawSocketUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
-    const socketUrl = rawSocketUrl.replace(/\/+$/, "");
-    const token = localStorage.getItem("token");
-    socket.current = io(socketUrl, {
-      auth: { token }
-    });
-    socket.current.on("getMessage", (data) => {
+    const s = socketRef?.current;
+    if (!s) return;
+    const handleGetMessage = (data) => {
       setArrivalMessage({
         sender: data.senderId,
         text: data.text,
         createdAt: data.createdAt || Date.now(),
         _id: data._id,
         conversationId: data.conversationId,
+        read: data.read || false,
       });
-    });
-    socket.current.on("getUsers", (users) => {
-      setOnlineUsers(users.map(u => u.userId));
-    });
-    return () => {
-      socket.current.disconnect();
     };
-  }, []);
+    s.on("getMessage", handleGetMessage);
+    return () => {
+      s.off("getMessage", handleGetMessage);
+    };
+  }, [socketRef]);
 
   useEffect(() => {
     if (!arrivalMessage) return;
@@ -173,22 +192,84 @@ export default function Messenger() {
 
   useEffect(() => {
     const getMessages = async () => {
+      if (!currentChat?._id) {
+        setMessages([]);
+        setMessagesLoading(false);
+        setUnreadMessageIds(new Set());
+        return;
+      }
       setMessagesLoading(true);
       try {
-        const res = await API.get("/chats/messages/" + currentChat?._id);
-        setMessages(res.data);
+        const res = await API.get("/chats/messages/" + currentChat._id);
+        const fetched = res.data;
+        setMessages(fetched);
+
+        const myId = (user?._id || user?.id)?.toString();
+        const unreadFromOther = fetched.filter((m) => {
+          const sId = (m.sender?._id || m.sender?.id || m.sender)?.toString();
+          return sId !== myId && m.read === false;
+        });
+
+        if (unreadFromOther.length > 0) {
+          const ids = new Set(unreadFromOther.map((m) => m._id?.toString()));
+          setUnreadMessageIds(ids);
+
+          // Mark conversation as read in backend
+          markConversationAsRead(currentChat._id);
+
+          // Update local conversation item
+          setConversations((prev) =>
+            prev.map((c) =>
+              c._id?.toString() === currentChat._id?.toString()
+                ? { ...c, unreadCount: 0, lastMessage: { ...c.lastMessage, read: true } }
+                : c
+            )
+          );
+
+          // Instagram-style: highlight unread messages, then smoothly settle to read after 2.5s
+          clearTimeout(unreadTimerRef.current);
+          unreadTimerRef.current = setTimeout(() => {
+            setUnreadMessageIds(new Set());
+          }, 2500);
+        } else {
+          setUnreadMessageIds(new Set());
+        }
       } catch (err) {
-        console.log(err);
+        console.error(err);
       } finally {
         setMessagesLoading(false);
       }
     };
-    if (currentChat && !currentChat.isNew) getMessages();
-    else if (currentChat?.isNew) {
+
+    if (currentChat && !currentChat.isNew) {
+      getMessages();
+    } else if (currentChat?.isNew) {
       setMessages([]);
       setMessagesLoading(false);
+      setUnreadMessageIds(new Set());
     }
-  }, [currentChat]);
+
+    return () => {
+      clearTimeout(unreadTimerRef.current);
+    };
+  }, [currentChat?._id, user, markConversationAsRead]);
+
+  // Read receipts: update own sent messages when other user reads them
+  useEffect(() => {
+    if (!lastReadReceipt || !currentChat?._id) return;
+    if (lastReadReceipt.conversationId?.toString() === currentChat._id?.toString()) {
+      setMessages((prev) =>
+        prev.map((m) => {
+          const mSender = (m.sender?._id || m.sender?.id || m.sender)?.toString();
+          const myId = (user?._id || user?.id)?.toString();
+          if (mSender === myId) {
+            return { ...m, read: true, readAt: lastReadReceipt.readAt || new Date() };
+          }
+          return m;
+        })
+      );
+    }
+  }, [lastReadReceipt, currentChat?._id, user]);
 
   // M14: Clear search timeout on unmount to prevent setState on unmounted component
   useEffect(() => {
@@ -326,6 +407,16 @@ export default function Messenger() {
   const handleSelectConversation = (convo) => {
     setCurrentChat(convo);
     setShowChat(true);
+    if (convo?._id) {
+      markConversationAsRead(convo._id);
+      setConversations((prev) =>
+        prev.map((c) =>
+          c._id?.toString() === convo._id?.toString()
+            ? { ...c, unreadCount: 0, lastMessage: { ...c.lastMessage, read: true } }
+            : c
+        )
+      );
+    }
   };
 
   const handleBack = () => {
@@ -370,15 +461,19 @@ export default function Messenger() {
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
-          {conversations.map((c, index) => (
-            <div key={c._id || index} onClick={() => handleSelectConversation(c)}>
-              <ConversationItem 
-                conversation={c} 
-                currentUser={user} 
-                active={(currentChat?._id === c._id && c._id !== null) || (currentChat?.isNew && !c._id && currentChat.participants.some(p => c.participants.some(cp => (cp._id || cp.id || cp).toString() === (p._id || p.id || p).toString())))}
-              />
-            </div>
-          ))}
+          {conversations.map((c, index) => {
+            const count = unreadPerConversation[c._id] ?? c.unreadCount ?? 0;
+            return (
+              <div key={c._id || index} onClick={() => handleSelectConversation(c)}>
+                <ConversationItem 
+                  conversation={c} 
+                  currentUser={user} 
+                  unreadCount={count}
+                  active={(currentChat?._id === c._id && c._id !== null) || (currentChat?.isNew && !c._id && currentChat.participants.some(p => c.participants.some(cp => (cp._id || cp.id || cp).toString() === (p._id || p.id || p).toString())))}
+                />
+              </div>
+            );
+          })}
           {conversations.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center text-zinc-400 mb-4">
@@ -454,25 +549,61 @@ export default function Messenger() {
                    <p className="text-zinc-400 dark:text-zinc-500 text-xs mt-0.5">Send a message to get started!</p>
                 </div>
               )}
-              {messages.map((m, index) => (
-                <div key={m._id || m.createdAt || index}>
-                  {shouldShowDateSeparator(messages, index) && (
-                    <div className="flex items-center justify-center my-4">
-                      <div className="px-3 py-1 bg-zinc-200/80 dark:bg-zinc-800/80 rounded-full">
-                        <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-                          {formatDateSeparator(m.createdAt)}
-                        </span>
+              {(() => {
+                const myId = (user?._id || user?.id)?.toString();
+                const firstUnreadIndex = messages.findIndex((m) => {
+                  const sId = (m.sender?._id || m.sender?.id || m.sender)?.toString();
+                  return sId !== myId && unreadMessageIds.has(m._id?.toString());
+                });
+
+                let lastOwnIdx = -1;
+                for (let i = messages.length - 1; i >= 0; i--) {
+                  const sId = (messages[i].sender?._id || messages[i].sender?.id || messages[i].sender)?.toString();
+                  if (sId === myId) {
+                    lastOwnIdx = i;
+                    break;
+                  }
+                }
+
+                return messages.map((m, index) => {
+                  const sId = (m.sender?._id || m.sender?.id || m.sender)?.toString();
+                  const isOwn = sId === myId;
+                  const isUnread = !isOwn && unreadMessageIds.has(m._id?.toString());
+                  const isSeen = isOwn && index === lastOwnIdx && (m.read || Boolean(lastReadReceipt && lastReadReceipt.conversationId?.toString() === currentChat?._id?.toString()));
+
+                  return (
+                    <div key={m._id || m.createdAt || index}>
+                      {index === firstUnreadIndex && (
+                        <div className="flex items-center justify-center my-4 animate-fade-in">
+                          <div className="flex items-center gap-2 px-3.5 py-1 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/80 rounded-full shadow-sm">
+                            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                            <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                              New Messages
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {shouldShowDateSeparator(messages, index) && (
+                        <div className="flex items-center justify-center my-4">
+                          <div className="px-3 py-1 bg-zinc-200/80 dark:bg-zinc-800/80 rounded-full">
+                            <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+                              {formatDateSeparator(m.createdAt)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      <div ref={index === messages.length - 1 ? messagesEndRef : null} className="fade-in">
+                        <ChatBox 
+                          message={m} 
+                          own={isOwn}
+                          isUnread={isUnread}
+                          isSeen={isSeen}
+                        />
                       </div>
                     </div>
-                  )}
-                  <div ref={index === messages.length - 1 ? messagesEndRef : null} className="fade-in">
-                    <ChatBox 
-                      message={m} 
-                      own={(m.sender?._id || m.sender?.id || m.sender)?.toString() === (user?._id || user?.id)?.toString()} 
-                    />
-                  </div>
-                </div>
-              ))}
+                  );
+                });
+              })()}
               {currentChat.isNew && messages.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                    <div className="w-16 h-16 bg-blue-50 dark:bg-zinc-800 rounded-2xl flex items-center justify-center text-blue-500 mb-4">

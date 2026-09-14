@@ -23,6 +23,7 @@ import LeftSidebar from "./components/LeftSidebar";
 import BottomNav from "./components/BottomNav";
 import WelcomeModal from "./components/WelcomeModal";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { ChatProvider } from "./context/ChatContext";
 import { ThemeProvider, ThemeContext } from "./context/ThemeContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 
@@ -39,11 +40,13 @@ function App() {
     <BrowserRouter>
         <ThemeProvider>
           <AuthProvider>
-            <ToastProvider>
-              <ErrorBoundary>
-                <AppContent />
-              </ErrorBoundary>
-            </ToastProvider>
+            <ChatProvider>
+              <ToastProvider>
+                <ErrorBoundary>
+                  <AppContent />
+                </ErrorBoundary>
+              </ToastProvider>
+            </ChatProvider>
           </AuthProvider>
         </ThemeProvider>
     </BrowserRouter>
