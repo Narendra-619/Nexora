@@ -33,6 +33,7 @@ const ConversationItem = memo(({ conversation, currentUser, active, unreadCount 
 
   const lastSenderId = (conversation.lastMessage?.sender?._id || conversation.lastMessage?.sender)?.toString();
   const isFromOther = lastSenderId && lastSenderId !== myId;
+  const isFromMe = lastSenderId && lastSenderId === myId;
   const hasUnreadLast = isFromOther && conversation.lastMessage?.read === false;
 
   const count = typeof unreadCount === "number"
@@ -40,6 +41,10 @@ const ConversationItem = memo(({ conversation, currentUser, active, unreadCount 
     : (conversation.unreadCount || (hasUnreadLast ? 1 : 0));
 
   const isUnread = count > 0;
+  const previewPrefix = isFromMe ? "You: " : "";
+  const previewText = conversation.lastMessage?.text
+    ? `${previewPrefix}${conversation.lastMessage.text}`
+    : "Started a new chat";
 
   return (
     <div className={`flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all duration-200 group relative ${active
@@ -91,7 +96,7 @@ const ConversationItem = memo(({ conversation, currentUser, active, unreadCount 
                 ? 'font-bold text-zinc-950 dark:text-zinc-100'
                 : 'text-zinc-500 dark:text-zinc-400 font-normal'
             }`}>
-            {conversation.lastMessage?.text || "Started a new chat"}
+            {previewText}
           </p>
           {isUnread && (
             <span className="shrink-0 flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-blue-600 text-white text-[10px] font-bold rounded-full shadow-sm">

@@ -18,10 +18,10 @@ export const getConversations = async (req, res) => {
     const conversations = await Conversation.find({
       participants: userObjectId
     })
-    .populate("participants", "username profilePicture")
-    .sort({ updatedAt: -1 })
-    .limit(limit)
-    .lean();
+      .populate("participants", "username profilePicture")
+      .sort({ updatedAt: -1 })
+      .limit(limit)
+      .lean();
 
     if (!conversations || conversations.length === 0) {
       return res.status(200).json([]);
@@ -150,7 +150,7 @@ export const sendMessage = async (req, res) => {
 
     let convoId = conversationId;
     let resolvedRecipientId = recipientId;
-    
+
     if (!convoId) {
       if (!recipientId || !mongoose.Types.ObjectId.isValid(recipientId)) {
         return res.status(400).json({ error: "Invalid recipient ID" });
@@ -208,9 +208,8 @@ export const sendMessage = async (req, res) => {
       updatedAt: new Date()
     });
 
-    // H4 + M15: Emit real-time message to recipient AFTER successful DB save
-    if (_io && resolvedRecipientId) {
-      const recipientIdStr = resolvedRecipientId.toString();
+    // H4 + M15: Emit real-time message to recipient AND sender AFTER successful DB save
+    if (_io) {
       const payload = {
         senderId: req.user._id.toString(),
         text: sanitizedText,
@@ -220,8 +219,10 @@ export const sendMessage = async (req, res) => {
         read: false,
       };
 
-      // Emit once to user's room (delivers to all active sockets of the user)
-      _io.to(recipientIdStr).emit("getMessage", payload);
+      if (resolvedRecipientId) {
+        _io.to(resolvedRecipientId.toString()).emit("getMessage", payload);
+      }
+      _io.to(req.user._id.toString()).emit("getMessage", payload);
     }
 
     res.status(201).json(message);

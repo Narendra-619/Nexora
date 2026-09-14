@@ -17,6 +17,11 @@ export const ChatProvider = ({ children }) => {
 
   const socketRef = useRef(null);
   const activeChatRef = useRef(activeConversationId);
+  const userRef = useRef(user);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   useEffect(() => {
     activeChatRef.current = activeConversationId;
@@ -27,7 +32,7 @@ export const ChatProvider = ({ children }) => {
   }, []);
 
   const fetchUnreadCount = useCallback(async () => {
-    if (!token || !user) {
+    if (!token || !userRef.current) {
       setUnreadCount(0);
       setUnreadPerConversation({});
       return;
@@ -39,11 +44,11 @@ export const ChatProvider = ({ children }) => {
     } catch (err) {
       console.error("Failed to fetch unread count:", err);
     }
-  }, [token, user]);
+  }, [token]);
 
-  // Establish shared Socket.io connection when authenticated
+  // Establish stable shared Socket.io connection when authenticated
   useEffect(() => {
-    if (!token || !user) {
+    if (!token) {
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
@@ -58,23 +63,31 @@ export const ChatProvider = ({ children }) => {
     const socketUrl = rawSocketUrl.replace(/\/+$/, "");
 
     const newSocket = io(socketUrl, {
-      auth: { token }
+      auth: { token },
+      transports: ["websocket", "polling"],
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000
     });
     socketRef.current = newSocket;
     setSocket(newSocket);
 
     newSocket.on("getMessage", (data) => {
-      const myId = (user._id || user.id)?.toString();
+      const myId = (userRef.current?._id || userRef.current?.id)?.toString();
       const senderId = (data.senderId || data.sender)?._id || (data.senderId || data.sender);
-      if (senderId?.toString() === myId) return;
+      const isFromMe = senderId?.toString() === myId;
 
       const convoIdStr = (data.conversationId?._id || data.conversationId)?.toString();
 
+      // Dispatch incoming message event with unique trigger key
       setLastIncomingMessage({
         ...data,
         conversationId: convoIdStr,
-        senderId: senderId?.toString()
+        senderId: senderId?.toString(),
+        isFromMe,
+        _receivedAt: Date.now()
       });
+
+      if (isFromMe) return;
 
       const isCurrentChat = activeChatRef.current &&
         convoIdStr &&
@@ -109,7 +122,7 @@ export const ChatProvider = ({ children }) => {
       socketRef.current = null;
       setSocket(null);
     };
-  }, [token, user, fetchUnreadCount]);
+  }, [token, fetchUnreadCount]);
 
   const markConversationAsRead = useCallback(async (conversationId) => {
     if (!conversationId) return;

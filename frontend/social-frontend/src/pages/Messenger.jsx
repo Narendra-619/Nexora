@@ -96,27 +96,9 @@ export default function Messenger() {
       _id: lastIncomingMessage._id,
       conversationId: lastIncomingMessage.conversationId,
       read: lastIncomingMessage.read || false,
+      isFromMe: lastIncomingMessage.isFromMe || false
     });
   }, [lastIncomingMessage]);
-
-  // Also bind directly to socket instance once available
-  useEffect(() => {
-    if (!socket) return;
-    const handleGetMessage = (data) => {
-      setArrivalMessage({
-        sender: data.senderId || data.sender,
-        text: data.text,
-        createdAt: data.createdAt || Date.now(),
-        _id: data._id,
-        conversationId: data.conversationId,
-        read: data.read || false,
-      });
-    };
-    socket.on("getMessage", handleGetMessage);
-    return () => {
-      socket.off("getMessage", handleGetMessage);
-    };
-  }, [socket]);
 
   // Handle ESC key to return to default inbox
   useEffect(() => {
@@ -150,7 +132,7 @@ export default function Messenger() {
     const isCurrentChat = (currentChatRef.current?._id && arrivalConvoId && currentChatRef.current._id.toString() === arrivalConvoId) ||
       currentChatRef.current?.participants?.some(isParticipant);
 
-    if (isCurrentChat) {
+    if (isCurrentChat && !arrivalMessage.isFromMe) {
       setMessages((prev) => {
         if (arrivalMessage._id && prev.some((m) => m._id && m._id.toString() === arrivalMessage._id.toString())) {
           return prev;
@@ -160,10 +142,10 @@ export default function Messenger() {
     }
 
     setConversations((prev) => {
-      const exists = prev.some(c => 
-        (arrivalConvoId && c._id?.toString() === arrivalConvoId) ||
-        c.participants?.some(isParticipant)
-      );
+      const exists = prev.some(c => {
+        const cIdStr = (c._id?.toString() || c.id?.toString());
+        return (arrivalConvoId && cIdStr === arrivalConvoId) || c.participants?.some(isParticipant);
+      });
 
       if (!exists) {
         API.get("/chats/conversations").then((res) => {
@@ -179,6 +161,7 @@ export default function Messenger() {
 
         if (matches) {
           const isViewing = currentChatRef.current?._id?.toString() === cIdStr;
+          const newUnread = arrivalMessage.isFromMe || isViewing ? 0 : ((c.unreadCount || 0) + 1);
           return {
             ...c,
             lastMessage: { 
@@ -187,7 +170,7 @@ export default function Messenger() {
               createdAt: arrivalMessage.createdAt || new Date(),
               read: isViewing ? true : false
             },
-            unreadCount: isViewing ? 0 : ((c.unreadCount || 0) + 1),
+            unreadCount: newUnread,
             updatedAt: arrivalMessage.createdAt || new Date()
           };
         }
@@ -435,19 +418,22 @@ export default function Messenger() {
         }
       } else {
         setConversations(prev => {
-          const updated = prev.map(c =>
-            c._id === currentChat._id
+          const currentChatIdStr = (currentChat._id || currentChat.id)?.toString();
+          const updated = prev.map(c => {
+            const cIdStr = (c._id || c.id)?.toString();
+            return (currentChatIdStr && cIdStr === currentChatIdStr)
               ? {
                 ...c,
                 lastMessage: {
                   text: savedMessage.text,
-                  sender: savedMessage.sender,
-                  createdAt: savedMessage.createdAt || new Date()
+                  sender: savedMessage.sender || myId,
+                  createdAt: savedMessage.createdAt || new Date(),
+                  read: true
                 },
                 updatedAt: savedMessage.createdAt || new Date()
               }
-              : c
-          ).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+              : c;
+          }).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
           conversationsRef.current = updated;
           return updated;
         });
