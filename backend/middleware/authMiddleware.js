@@ -25,10 +25,18 @@ export const protect = async (req, res, next) => {
     }
 
     // Verify token using secret key
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
+    const decoded = jwt.verify(token, secret);
+
+    if (decoded.type && decoded.type !== "access") {
+      return res.status(401).json({ error: "Invalid token type. Access token required." });
+    }
+
+    const userId = decoded.sub || decoded.id;
 
     // Fetch user from DB excluding password field and attach to request object
-    req.user = await User.findById(decoded.id).select("-password");
+    req.user = await User.findById(userId).select("-password");
+    req.userId = userId;
 
     if (!req.user) {
       return res.status(401).json({ error: "User account no longer exists" });

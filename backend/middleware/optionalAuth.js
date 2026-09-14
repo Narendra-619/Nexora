@@ -12,8 +12,11 @@ export const optionalAuth = async (req, res, next) => {
     }
 
     if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = await User.findById(decoded.id).select("-password");
+      const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
+      const decoded = jwt.verify(token, secret);
+      const userId = decoded.sub || decoded.id;
+      req.user = await User.findById(userId).select("-password");
+      req.userId = userId;
     }
   } catch {
     // Token invalid — continue without user

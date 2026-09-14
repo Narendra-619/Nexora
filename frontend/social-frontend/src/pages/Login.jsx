@@ -28,7 +28,7 @@ export default function Login() {
     setError("");
     try {
       const res = await API.post("/auth/login", { email, password });
-      loginAuth(res.data.token, res.data.user);
+      loginAuth(res.data.accessToken || res.data.token, res.data.user);
       navigate("/feed");
     } catch (err) {
       setError(err.response?.data?.error || "Invalid credentials");

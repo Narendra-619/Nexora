@@ -8,6 +8,14 @@ export const authLimiter = rateLimit({
   legacyHeaders: false
 });
 
+export const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  message: { error: "Too many session refresh requests, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
 export const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 3,

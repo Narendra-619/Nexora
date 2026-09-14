@@ -55,7 +55,7 @@ function App() {
 
 function AppContent() {
   const { theme } = useContext(ThemeContext);
-  const { showWelcome, closeWelcome, user, token } = useContext(AuthContext);
+  const { showWelcome, closeWelcome, user, token, loading } = useContext(AuthContext);
   const isAuthenticated = !!user && !!token;
 
   useEffect(() => {
@@ -65,6 +65,19 @@ function AppContent() {
       document.documentElement.classList.remove("dark");
     }
   }, [theme]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-zinc-50 dark:bg-black flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/30 animate-pulse">
+            <span className="font-black text-xl tracking-wider">N</span>
+          </div>
+          <div className="w-6 h-6 border-2 border-zinc-300 dark:border-zinc-700 border-t-blue-600 rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-100 transition-colors duration-200">

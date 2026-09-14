@@ -20,6 +20,8 @@ import helmet from "helmet";
 import errorHandler from "./middleware/errorHandler.js";
 import { injectSocket } from "./controllers/chatController.js";
 
+import cookieParser from "cookie-parser";
+
 // Load environment variables
 dotenv.config();
 
@@ -28,8 +30,23 @@ const PORT = process.env.PORT || 3000;
 
 app.set("trust proxy", 1);
 
-// Security headers
-app.use(helmet());
+// Security headers with tailored Content Security Policy
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+      imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com"],
+      connectSrc: ["'self'", "ws:", "wss:", "http://localhost:3000", "ws://localhost:3000", "https:"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"]
+    }
+  },
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 
 // CORS allowed origins: supports CLIENT_URL from env, production Vercel frontend, and local dev
 const clientUrls = (process.env.CLIENT_URL || "")
@@ -51,6 +68,9 @@ app.use(cors({
   origin: allowedOrigins,
   credentials: true
 }));
+
+// Cookie parsing middleware
+app.use(cookieParser());
 
 // Increase payload limit for image uploads and base64 data
 app.use(express.json({ limit: '10mb' }));
@@ -94,8 +114,19 @@ io.use((socket, next) => {
     return next(new Error("Authentication required"));
   }
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    socket.userId = decoded.id;
+    const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
+    const decoded = jwt.verify(token, secret);
+
+    if (decoded.type !== "access") {
+      return next(new Error("Invalid token type. Access token required."));
+    }
+
+    const userId = (decoded.sub || decoded.id)?.toString();
+    if (!userId) {
+      return next(new Error("Invalid token claims"));
+    }
+
+    socket.userId = userId;
     next();
   } catch (err) {
     next(new Error("Invalid token"));

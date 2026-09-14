@@ -61,7 +61,7 @@ export default function VerifyOTP() {
     try {
       if (isRegistration) {
         const res = await API.post("/auth/verify-email", { email, otp: otpString });
-        loginAuth(res.data.token, res.data.user, true);
+        loginAuth(res.data.accessToken || res.data.token, res.data.user, true);
         navigate("/feed");
       } else {
         const res = await API.post("/auth/verify-otp", { email, otp: otpString });

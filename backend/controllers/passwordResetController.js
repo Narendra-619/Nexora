@@ -1,8 +1,10 @@
 import User from "../models/User.js";
 import PasswordReset from "../models/PasswordReset.js";
+import Session from "../models/Session.js";
 import { sendOTPEmail, sendVerificationEmail } from "../services/emailService.js";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
+import { createSession, setRefreshCookie, clearRefreshCookie } from "../services/tokenService.js";
 
 const generateOTP = () => {
   return crypto.randomInt(100000, 1000000).toString();
@@ -123,6 +125,15 @@ export const resetPassword = async (req, res) => {
     user.password = newPassword;
     await user.save();
 
+    // Revoke all active refresh sessions for this user so old refresh tokens are invalidated
+    await Session.updateMany(
+      { userId: user._id, revokedAt: null },
+      { $set: { revokedAt: new Date() } }
+    );
+
+    // Clear refresh cookie if present on caller's browser
+    clearRefreshCookie(res, req);
+
     res.status(200).json({ message: "Password reset successful" });
   } catch (error) {
     console.error("RESET PASSWORD ERROR:", error);
@@ -167,19 +178,19 @@ export const verifyEmail = async (req, res) => {
     user.isVerified = true;
     await user.save();
 
-    const token = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const session = await createSession({ userId: user._id, req });
+    setRefreshCookie(res, session.rawRefreshToken, req);
 
     res.status(200).json({
       message: "Email verified successfully",
-      token,
+      accessToken: session.accessToken,
+      token: session.accessToken,
       user: {
         id: user._id,
+        _id: user._id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        profilePicture: user.profilePicture
       }
     });
   } catch (error) {

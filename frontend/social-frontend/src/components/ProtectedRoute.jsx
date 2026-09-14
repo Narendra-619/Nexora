@@ -1,34 +1,19 @@
-import { useContext, useEffect, useMemo } from "react";
+import { useContext } from "react";
 import { Navigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 
 export default function ProtectedRoute({ children }) {
-  const { token, logoutAuth } = useContext(AuthContext);
+  const { token, user, loading } = useContext(AuthContext);
 
-  const isExpired = useMemo(() => {
-    if (!token) return true;
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      // eslint-disable-next-line react-hooks/purity
-      return typeof payload.exp === "number" ? payload.exp * 1000 < Date.now() : true;
-    } catch {
-      return true;
-    }
-  }, [token]);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-zinc-200 dark:border-zinc-800 border-t-blue-600"></div>
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    if (!token) return;
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      if (payload.exp * 1000 < Date.now()) {
-        logoutAuth();
-      }
-    } catch {
-      logoutAuth();
-    }
-  }, [token, logoutAuth]);
-
-  if (!token || isExpired) {
+  if (!token && !user) {
     return <Navigate to="/" replace />;
   }
 
