@@ -1,1 +1,3 @@
 so thiss is a basic readme file im doing to check my pipeline
+
+made some changes
