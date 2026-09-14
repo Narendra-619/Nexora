@@ -5,7 +5,7 @@ import { ChatContext } from "../context/ChatContext";
 
 const BottomNav = () => {
   const { user } = useContext(AuthContext);
-  const { unreadCount } = useContext(ChatContext);
+  const { unreadCount, resetInbox } = useContext(ChatContext);
   const location = useLocation();
   const navigate = useNavigate();
   const [showCreateMenu, setShowCreateMenu] = useState(false);
@@ -53,62 +53,72 @@ const BottomNav = () => {
       )
     },
     {
-      to: "/saved",
-      label: "Saved",
+      to: "/notifications",
+      label: "Activity",
       icon: (active) => (
         <svg className={`w-6 h-6 ${active ? "text-blue-600" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? "2.5" : "2"} d="M5 2h14a1 1 0 011 1v19.143a.5.5 0 01-.766.424L12 18.03l-7.234 4.536A.5.5 0 014 22.143V3a1 1 0 011-1zm7 14l5.5-3.5V3H6.5v9.5L12 16z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? "2.5" : "2"} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
       )
     },
-    {
-      to: user ? `/profile/${user._id || user.id}` : "/feed",
+    ...(user?._id || user?.id ? [{
+      to: `/profile/${user._id || user.id}`,
       label: "Profile",
       icon: (active) => (
-        <div className={`w-6 h-6 rounded-full overflow-hidden border-2 ${active ? "border-blue-600" : "border-zinc-300 dark:border-zinc-600"}`}>
+        <div className={`w-6 h-6 rounded-full overflow-hidden border-2 transition-colors ${active ? "border-blue-600" : "border-transparent"}`}>
           {user?.profilePicture ? (
             <img src={user.profilePicture} alt={user.username} className="w-full h-full object-cover" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-zinc-200 dark:bg-zinc-700 text-xs font-bold text-zinc-600 dark:text-zinc-300">
+            <div className="w-full h-full bg-blue-100 dark:bg-zinc-700 flex items-center justify-center text-blue-600 dark:text-blue-400 text-xs font-bold">
               {user?.username?.charAt(0).toUpperCase()}
             </div>
           )}
         </div>
       )
-    }
+    }] : [])
   ];
 
   return (
     <>
-      {/* Create menu overlay */}
+      {/* Create menu backdrop */}
       {showCreateMenu && (
-        <>
-          <div className="fixed inset-0 z-[49] bg-black/30" onClick={() => setShowCreateMenu(false)} />
-          <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[51] bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 py-2 w-48 fade-in">
-            <button
-              onClick={() => handleCreateClick("image")}
-              className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
-            >
-              <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              Photo
-            </button>
-            <button
-              onClick={() => handleCreateClick("video")}
-              className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
-            >
-              <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-              Video
-            </button>
-          </div>
-        </>
+        <div
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden"
+          onClick={() => setShowCreateMenu(false)}
+        />
       )}
 
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-t border-zinc-200 dark:border-zinc-800 px-4 pb-safe">
-        <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
+      {/* Floating Create Menu */}
+      {showCreateMenu && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-white dark:bg-zinc-900 px-4 py-3 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 md:hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <button
+            onClick={() => handleCreateClick("image")}
+            className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          >
+            <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <span className="text-[11px] font-medium text-zinc-700 dark:text-zinc-300">Photo</span>
+          </button>
+          <button
+            onClick={() => handleCreateClick("video")}
+            className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          >
+            <div className="w-10 h-10 rounded-full bg-purple-50 dark:bg-purple-950/40 text-purple-600 flex items-center justify-center">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <span className="text-[11px] font-medium text-zinc-700 dark:text-zinc-300">Video</span>
+          </button>
+        </div>
+      )}
+
+      {/* Main Bottom Bar */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 md:hidden px-4 py-1">
+        <div className="flex items-center justify-around">
           {tabs.map(({ to, label, icon, isCreate }) => {
             if (isCreate) {
               return (
@@ -127,6 +137,11 @@ const BottomNav = () => {
               <Link
                 key={to}
                 to={to}
+                onClick={() => {
+                  if (to === "/messenger") {
+                    resetInbox();
+                  }
+                }}
                 className="flex flex-col items-center gap-0.5 py-1 transition-all min-w-[48px]"
               >
                 {icon(isActive)}

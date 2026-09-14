@@ -30,15 +30,18 @@ function shouldShowDateSeparator(messages, index) {
 export default function Messenger() {
   const { user } = useContext(AuthContext);
   const {
+    unreadCount,
     unreadPerConversation,
     markConversationAsRead,
     setActiveConversationId,
     lastReadReceipt,
-    onlineUsers: globalOnlineUsers,
-    socketRef
+    socket,
+    lastIncomingMessage,
+    resetInboxTrigger
   } = useContext(ChatContext);
 
   const [conversations, setConversations] = useState([]);
+  const [conversationsLoading, setConversationsLoading] = useState(true);
   const [currentChat, setCurrentChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
@@ -48,7 +51,6 @@ export default function Messenger() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
-  const [onlineUsers, setOnlineUsers] = useState([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [sending, setSending] = useState(false);
@@ -64,11 +66,13 @@ export default function Messenger() {
   const currentChatRef = useRef(currentChat);
   const unreadTimerRef = useRef(null);
 
+  // Reset to default inbox when clicking Messages tab
   useEffect(() => {
-    if (globalOnlineUsers) {
-      setOnlineUsers(globalOnlineUsers);
+    if (resetInboxTrigger > 0) {
+      setCurrentChat(null);
+      setShowChat(false);
     }
-  }, [globalOnlineUsers]);
+  }, [resetInboxTrigger]);
 
   useEffect(() => {
     setActiveConversationId(currentChat?._id || null);
@@ -82,12 +86,25 @@ export default function Messenger() {
     setShowEmojiPicker(false);
   }, [currentChat]);
 
+  // Real-time message reception from ChatContext reactive state
   useEffect(() => {
-    const s = socketRef?.current;
-    if (!s) return;
+    if (!lastIncomingMessage) return;
+    setArrivalMessage({
+      sender: lastIncomingMessage.senderId || lastIncomingMessage.sender,
+      text: lastIncomingMessage.text,
+      createdAt: lastIncomingMessage.createdAt || Date.now(),
+      _id: lastIncomingMessage._id,
+      conversationId: lastIncomingMessage.conversationId,
+      read: lastIncomingMessage.read || false,
+    });
+  }, [lastIncomingMessage]);
+
+  // Also bind directly to socket instance once available
+  useEffect(() => {
+    if (!socket) return;
     const handleGetMessage = (data) => {
       setArrivalMessage({
-        sender: data.senderId,
+        sender: data.senderId || data.sender,
         text: data.text,
         createdAt: data.createdAt || Date.now(),
         _id: data._id,
@@ -95,22 +112,45 @@ export default function Messenger() {
         read: data.read || false,
       });
     };
-    s.on("getMessage", handleGetMessage);
+    socket.on("getMessage", handleGetMessage);
     return () => {
-      s.off("getMessage", handleGetMessage);
+      socket.off("getMessage", handleGetMessage);
     };
-  }, [socketRef]);
+  }, [socket]);
+
+  // Handle ESC key to return to default inbox
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        if (showNewChat) {
+          setShowNewChat(false);
+        } else if (currentChat) {
+          handleBack();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [currentChat, showNewChat]);
 
   useEffect(() => {
     if (!arrivalMessage) return;
 
+    const arrivalSenderId = (arrivalMessage.sender?._id || arrivalMessage.sender?.id || arrivalMessage.sender)?.toString();
+    const arrivalConvoId = (arrivalMessage.conversationId?._id || arrivalMessage.conversationId)?.toString();
+
     const isParticipant = (p) => {
       const pId = (p?._id || p?.id || p)?.toString();
-      const aId = (arrivalMessage.sender?._id || arrivalMessage.sender?.id || arrivalMessage.sender)?.toString();
-      return pId && aId && pId === aId;
+      return pId && arrivalSenderId && pId === arrivalSenderId;
     };
-    
-    if (currentChatRef.current?.participants?.some(isParticipant)) {
+
+    // If we're currently chatting with this user or in this conversation
+    const isCurrentChat = (currentChatRef.current?._id && arrivalConvoId && currentChatRef.current._id.toString() === arrivalConvoId) ||
+      currentChatRef.current?.participants?.some(isParticipant);
+
+    if (isCurrentChat) {
       setMessages((prev) => {
         if (arrivalMessage._id && prev.some((m) => m._id && m._id.toString() === arrivalMessage._id.toString())) {
           return prev;
@@ -120,7 +160,11 @@ export default function Messenger() {
     }
 
     setConversations((prev) => {
-      const exists = prev.some(c => c.participants?.some(isParticipant));
+      const exists = prev.some(c => 
+        (arrivalConvoId && c._id?.toString() === arrivalConvoId) ||
+        c.participants?.some(isParticipant)
+      );
+
       if (!exists) {
         API.get("/chats/conversations").then((res) => {
           setConversations(res.data);
@@ -128,20 +172,28 @@ export default function Messenger() {
         }).catch(console.error);
         return prev;
       }
+
       const updated = prev.map(c => {
-        if (c.participants?.some(isParticipant)) {
+        const cIdStr = (c._id?.toString() || c.id?.toString());
+        const matches = (arrivalConvoId && cIdStr === arrivalConvoId) || c.participants?.some(isParticipant);
+
+        if (matches) {
+          const isViewing = currentChatRef.current?._id?.toString() === cIdStr;
           return {
             ...c,
             lastMessage: { 
               text: arrivalMessage.text, 
               sender: arrivalMessage.sender,
-              createdAt: arrivalMessage.createdAt || new Date()
+              createdAt: arrivalMessage.createdAt || new Date(),
+              read: isViewing ? true : false
             },
+            unreadCount: isViewing ? 0 : ((c.unreadCount || 0) + 1),
             updatedAt: arrivalMessage.createdAt || new Date()
           };
         }
         return c;
       }).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
       conversationsRef.current = updated;
       return updated;
     });
@@ -153,20 +205,21 @@ export default function Messenger() {
 
   useEffect(() => {
     const getConversations = async () => {
+      setConversationsLoading(true);
       try {
         const res = await API.get("/chats/conversations");
         setConversations(res.data);
         conversationsRef.current = res.data;
-        
+
         if (location.state?.startChatWith) {
           const targetUser = location.state.startChatWith;
           const targetId = (targetUser._id || targetUser.id)?.toString();
           const myId = (user?._id || user?.id)?.toString();
-          
-          const existingConvo = res.data.find(c => 
+
+          const existingConvo = res.data.find(c =>
             c.participants?.some(p => (p?._id || p?.id || p)?.toString() === targetId)
           );
-          
+
           if (existingConvo) {
             setCurrentChat(existingConvo);
             setShowChat(true);
@@ -183,11 +236,13 @@ export default function Messenger() {
           }
         }
       } catch (err) {
-        console.log(err);
+        console.error("Failed to load conversations:", err);
+      } finally {
+        setConversationsLoading(false);
       }
     };
     getConversations();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?._id || user?.id, location.state]);
 
   useEffect(() => {
@@ -308,10 +363,10 @@ export default function Messenger() {
   const handleStartChat = (targetUser) => {
     const targetId = (targetUser._id || targetUser.id)?.toString();
     const myId = (user?._id || user?.id)?.toString();
-    const existingConvo = conversationsRef.current.find(c => 
+    const existingConvo = conversationsRef.current.find(c =>
       c.participants?.some(p => (p?._id || p?.id || p)?.toString() === targetId)
     );
-    
+
     if (existingConvo) {
       setCurrentChat(existingConvo);
     } else {
@@ -368,9 +423,9 @@ export default function Messenger() {
         const convosRes = await API.get("/chats/conversations");
         setConversations(convosRes.data);
         conversationsRef.current = convosRes.data;
-        const newConvo = convosRes.data.find(c => 
+        const newConvo = convosRes.data.find(c =>
           c._id?.toString() === savedMessage.conversationId?.toString()
-        ) || convosRes.data.find(c => 
+        ) || convosRes.data.find(c =>
           c.participants?.some(p => (p?._id || p?.id || p)?.toString() === receiverId)
         );
         if (newConvo) {
@@ -380,18 +435,18 @@ export default function Messenger() {
         }
       } else {
         setConversations(prev => {
-          const updated = prev.map(c => 
-            c._id === currentChat._id 
-            ? { 
-                ...c, 
-                lastMessage: { 
-                  text: savedMessage.text, 
+          const updated = prev.map(c =>
+            c._id === currentChat._id
+              ? {
+                ...c,
+                lastMessage: {
+                  text: savedMessage.text,
                   sender: savedMessage.sender,
                   createdAt: savedMessage.createdAt || new Date()
-                }, 
-                updatedAt: savedMessage.createdAt || new Date() 
-              } 
-            : c
+                },
+                updatedAt: savedMessage.createdAt || new Date()
+              }
+              : c
           ).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
           conversationsRef.current = updated;
           return updated;
@@ -420,6 +475,7 @@ export default function Messenger() {
   };
 
   const handleBack = () => {
+    setCurrentChat(null);
     setShowChat(false);
   };
 
@@ -452,35 +508,63 @@ export default function Messenger() {
       {/* Conversations List */}
       <div className={`${showChat ? 'hidden md:flex' : 'flex'} w-full md:w-1/3 lg:w-1/4 border-r border-zinc-200 dark:border-zinc-800 flex-col bg-white dark:bg-zinc-900`}>
         <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-          <h2 className="text-xl font-bold dark:text-white">Messages</h2>
-          <button 
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-xl font-bold dark:text-white">Messages</h2>
+            {unreadCount > 0 && (
+              <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-blue-600 text-white shadow-sm shadow-blue-500/30">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </div>
+          <button
             onClick={() => setShowNewChat(true)}
             className="w-9 h-9 bg-blue-50 dark:bg-zinc-800 rounded-xl flex items-center justify-center text-blue-600 hover:bg-blue-100 dark:hover:bg-zinc-700 transition-colors"
+            title="Start new chat"
           >
-             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
-          {conversations.map((c, index) => {
-            const count = unreadPerConversation[c._id] ?? c.unreadCount ?? 0;
+          {conversationsLoading && (
+            <div className="space-y-2 p-2">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center gap-3 p-3 rounded-2xl animate-pulse">
+                  <div className="w-12 h-12 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="flex justify-between">
+                      <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-24" />
+                      <div className="h-3 bg-zinc-100 dark:bg-zinc-800/60 rounded w-10" />
+                    </div>
+                    <div className="h-3 bg-zinc-100 dark:bg-zinc-800/60 rounded w-36" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {!conversationsLoading && conversations.map((c, index) => {
+            const cId = (c._id || c.id)?.toString();
+            const count = (unreadPerConversation && unreadPerConversation[cId] !== undefined)
+              ? unreadPerConversation[cId]
+              : (c.unreadCount || 0);
+
             return (
               <div key={c._id || index} onClick={() => handleSelectConversation(c)}>
-                <ConversationItem 
-                  conversation={c} 
-                  currentUser={user} 
+                <ConversationItem
+                  conversation={c}
+                  currentUser={user}
                   unreadCount={count}
                   active={(currentChat?._id === c._id && c._id !== null) || (currentChat?.isNew && !c._id && currentChat.participants.some(p => c.participants.some(cp => (cp._id || cp.id || cp).toString() === (p._id || p.id || p).toString())))}
                 />
               </div>
             );
           })}
-          {conversations.length === 0 && (
+          {!conversationsLoading && conversations.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center text-zinc-400 mb-4">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
               </div>
               <p className="text-zinc-500 dark:text-zinc-400 text-sm font-medium">No conversations yet</p>
-              <p className="text-zinc-400 dark:text-zinc-500 text-xs mt-1">Start a new chat below</p>
+              <p className="text-zinc-400 dark:text-zinc-500 text-xs mt-1">Start a new chat above</p>
             </div>
           )}
         </div>
@@ -493,35 +577,33 @@ export default function Messenger() {
             {/* Chat Header */}
             <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md flex items-center justify-between sticky top-0 z-10">
               <div className="flex items-center gap-3">
-                <button onClick={handleBack} className="md:hidden p-1 text-zinc-500 hover:text-zinc-900 dark:hover:text-white mr-1">
+                <button 
+                  onClick={handleBack} 
+                  title="Back to inbox"
+                  className="p-2 -ml-1 text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors mr-1 flex items-center justify-center cursor-pointer"
+                  aria-label="Back to inbox"
+                >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
                 </button>
                 {(() => {
                   const otherUser = getOtherUser(currentChat);
-                  const isOnline = onlineUsers.includes(otherUser?._id?.toString());
                   return (
                     <>
-                      <div className="relative">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 p-[2px]">
-                          <div className="w-full h-full rounded-full bg-white dark:bg-zinc-900 p-[2px]">
-                            <div className="w-full h-full rounded-full bg-blue-50 dark:bg-zinc-800 flex items-center justify-center overflow-hidden">
-                              {otherUser?.profilePicture ? (
-                                <img src={otherUser.profilePicture} className="w-full h-full object-cover" />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center font-semibold text-blue-600 text-sm">
-                                  {otherUser?.username?.charAt(0).toUpperCase()}
-                                </div>
-                              )}
-                            </div>
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 p-[2px]">
+                        <div className="w-full h-full rounded-full bg-white dark:bg-zinc-900 p-[2px]">
+                          <div className="w-full h-full rounded-full bg-blue-50 dark:bg-zinc-800 flex items-center justify-center overflow-hidden">
+                            {otherUser?.profilePicture ? (
+                              <img src={otherUser.profilePicture} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center font-semibold text-blue-600 text-sm">
+                                {otherUser?.username?.charAt(0).toUpperCase()}
+                              </div>
+                            )}
                           </div>
                         </div>
-                        {isOnline && (
-                          <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white dark:border-zinc-900" />
-                        )}
                       </div>
                       <div>
                         <span className="font-semibold dark:text-white text-sm block leading-tight">{otherUser?.username || "Unknown User"}</span>
-                        <span className="text-xs text-zinc-400 dark:text-zinc-500">{isOnline ? "Online" : "Offline"}</span>
                       </div>
                     </>
                   );
@@ -530,23 +612,23 @@ export default function Messenger() {
             </div>
 
             {/* Messages Area */}
-            <div 
+            <div
               ref={messagesContainerRef}
               onScroll={handleMessagesScroll}
               className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar relative"
             >
               {messagesLoading && !currentChat.isNew && (
                 <div className="flex justify-center items-center h-full">
-                   <div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-200 dark:border-zinc-800 border-t-blue-600"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-200 dark:border-zinc-800 border-t-blue-600"></div>
                 </div>
               )}
               {!messagesLoading && messages.length === 0 && !currentChat.isNew && (
                 <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                   <div className="w-14 h-14 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center text-zinc-400 mb-3">
-                     <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-                   </div>
-                   <p className="text-zinc-600 dark:text-zinc-400 text-sm font-medium">No messages in this chat yet.</p>
-                   <p className="text-zinc-400 dark:text-zinc-500 text-xs mt-0.5">Send a message to get started!</p>
+                  <div className="w-14 h-14 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center text-zinc-400 mb-3">
+                    <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                  </div>
+                  <p className="text-zinc-600 dark:text-zinc-400 text-sm font-medium">No messages in this chat yet.</p>
+                  <p className="text-zinc-400 dark:text-zinc-500 text-xs mt-0.5">Send a message to get started!</p>
                 </div>
               )}
               {(() => {
@@ -593,8 +675,8 @@ export default function Messenger() {
                         </div>
                       )}
                       <div ref={index === messages.length - 1 ? messagesEndRef : null} className="fade-in">
-                        <ChatBox 
-                          message={m} 
+                        <ChatBox
+                          message={m}
                           own={isOwn}
                           isUnread={isUnread}
                           isSeen={isSeen}
@@ -606,11 +688,11 @@ export default function Messenger() {
               })()}
               {currentChat.isNew && messages.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-full text-center">
-                   <div className="w-16 h-16 bg-blue-50 dark:bg-zinc-800 rounded-2xl flex items-center justify-center text-blue-500 mb-4">
-                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-                   </div>
-                   <h3 className="text-lg font-bold dark:text-white">Say hello!</h3>
-                   <p className="text-zinc-400 dark:text-zinc-500 mt-1 text-sm max-w-[200px]">Send your first message to start chatting.</p>
+                  <div className="w-16 h-16 bg-blue-50 dark:bg-zinc-800 rounded-2xl flex items-center justify-center text-blue-500 mb-4">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                  </div>
+                  <h3 className="text-lg font-bold dark:text-white">Say hello!</h3>
+                  <p className="text-zinc-400 dark:text-zinc-500 mt-1 text-sm max-w-[200px]">Send your first message to start chatting.</p>
                 </div>
               )}
               <div ref={messagesEndRef} />
@@ -641,11 +723,10 @@ export default function Messenger() {
                 <button
                   type="button"
                   onClick={() => setShowEmojiPicker((prev) => !prev)}
-                  className={`p-2 rounded-xl transition-all ${
-                    showEmojiPicker
+                  className={`p-2 rounded-xl transition-all ${showEmojiPicker
                       ? "bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400"
                       : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-700/60"
-                  }`}
+                    }`}
                   title="Choose emoji"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -659,7 +740,7 @@ export default function Messenger() {
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                 />
-                <button 
+                <button
                   type="submit"
                   disabled={!newMessage.trim() || sending}
                   className="bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-300 dark:disabled:bg-zinc-700 text-white p-2.5 rounded-xl transition-all active:scale-95 flex items-center justify-center min-w-[40px] min-h-[40px]"
@@ -676,7 +757,7 @@ export default function Messenger() {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-12">
             <div className="w-20 h-20 bg-zinc-100 dark:bg-zinc-800 rounded-3xl flex items-center justify-center text-zinc-400 mb-6">
-               <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
+              <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
             </div>
             <h3 className="text-xl font-bold dark:text-white">Your Inbox</h3>
             <p className="text-zinc-500 dark:text-zinc-400 mt-2 text-sm max-w-[280px]">Select a conversation or start a new chat.</p>

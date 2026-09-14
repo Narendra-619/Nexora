@@ -102,36 +102,15 @@ io.use((socket, next) => {
   }
 });
 
-let onlineUsers = [];
-
-// H4: Inject io + onlineUsers into chatController so HTTP sendMessage
+// H4: Inject io into chatController so HTTP sendMessage
 // can emit real-time events after persisting to DB.
-injectSocket(io, () => onlineUsers);
+injectSocket(io);
 
 io.on("connection", (socket) => {
-  console.log("A user connected:", socket.id);
-
   const userId = socket.userId?.toString();
   if (userId) {
     socket.join(userId);
   }
-
-  const existingUserIndex = onlineUsers.findIndex((u) => u.userId === userId);
-  if (existingUserIndex !== -1) {
-    onlineUsers[existingUserIndex].socketId = socket.id;
-  } else if (userId) {
-    onlineUsers.push({ userId, socketId: socket.id });
-  }
-  io.emit("getUsers", onlineUsers);
-
-  socket.on("disconnect", () => {
-    const idx = onlineUsers.findIndex((u) => u.socketId === socket.id);
-    if (idx !== -1) {
-      onlineUsers.splice(idx, 1);
-    }
-    io.emit("getUsers", onlineUsers);
-    console.log("User disconnected");
-  });
 });
 
 // C1, C2: Only start server after MongoDB connects

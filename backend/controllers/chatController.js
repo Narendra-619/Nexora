@@ -2,34 +2,38 @@ import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
 import mongoose from "mongoose";
 
-// io and onlineUsers are injected by index.js so the HTTP handler
+// io is injected by index.js so the HTTP handler
 // can emit to the recipient socket after persisting the message (H4).
 let _io = null;
-let _onlineUsers = null;
 
-export const injectSocket = (io, onlineUsers) => {
+export const injectSocket = (io) => {
   _io = io;
-  _onlineUsers = onlineUsers;
 };
 
 export const getConversations = async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 50, 100); // M7: pagination cap
+    const userObjectId = new mongoose.Types.ObjectId(req.user._id);
+
     const conversations = await Conversation.find({
-      participants: req.user._id
+      participants: userObjectId
     })
     .populate("participants", "username profilePicture")
     .sort({ updatedAt: -1 })
     .limit(limit)
     .lean();
 
+    if (!conversations || conversations.length === 0) {
+      return res.status(200).json([]);
+    }
+
     const convoIds = conversations.map((c) => c._id);
     const unreadAgg = await Message.aggregate([
       {
         $match: {
           conversationId: { $in: convoIds },
-          sender: { $ne: new mongoose.Types.ObjectId(req.user._id) },
-          read: false
+          read: false,
+          sender: { $ne: userObjectId }
         }
       },
       {
@@ -63,7 +67,7 @@ export const getUnreadCount = async (req, res) => {
 
     const userConvos = await Conversation.find({
       participants: userObjectId
-    }).select("_id");
+    }).select("_id").lean();
 
     const convoIds = userConvos.map((c) => c._id);
 
@@ -75,8 +79,8 @@ export const getUnreadCount = async (req, res) => {
       {
         $match: {
           conversationId: { $in: convoIds },
-          sender: { $ne: userObjectId },
-          read: false
+          read: false,
+          sender: { $ne: userObjectId }
         }
       },
       {

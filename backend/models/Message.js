@@ -32,6 +32,7 @@ const messageSchema = new mongoose.Schema({
 messageSchema.index({ conversationId: 1 });
 messageSchema.index({ conversationId: 1, createdAt: 1 });
 messageSchema.index({ conversationId: 1, sender: 1, read: 1 });
+messageSchema.index({ conversationId: 1, read: 1, sender: 1 });
 
 const Message = mongoose.model("Message", messageSchema);
 export default Message;

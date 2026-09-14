@@ -9,9 +9,11 @@ export const ChatProvider = ({ children }) => {
   const { user, token } = useContext(AuthContext);
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadPerConversation, setUnreadPerConversation] = useState({});
-  const [onlineUsers, setOnlineUsers] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [lastReadReceipt, setLastReadReceipt] = useState(null);
+  const [socket, setSocket] = useState(null);
+  const [lastIncomingMessage, setLastIncomingMessage] = useState(null);
+  const [resetInboxTrigger, setResetInboxTrigger] = useState(0);
 
   const socketRef = useRef(null);
   const activeChatRef = useRef(activeConversationId);
@@ -19,6 +21,10 @@ export const ChatProvider = ({ children }) => {
   useEffect(() => {
     activeChatRef.current = activeConversationId;
   }, [activeConversationId]);
+
+  const resetInbox = useCallback(() => {
+    setResetInboxTrigger((prev) => prev + 1);
+  }, []);
 
   const fetchUnreadCount = useCallback(async () => {
     if (!token || !user) {
@@ -42,9 +48,9 @@ export const ChatProvider = ({ children }) => {
         socketRef.current.disconnect();
         socketRef.current = null;
       }
+      setSocket(null);
       setUnreadCount(0);
       setUnreadPerConversation({});
-      setOnlineUsers([]);
       return;
     }
 
@@ -55,30 +61,35 @@ export const ChatProvider = ({ children }) => {
       auth: { token }
     });
     socketRef.current = newSocket;
-
-    newSocket.on("getUsers", (users) => {
-      setOnlineUsers(users.map((u) => u.userId));
-    });
+    setSocket(newSocket);
 
     newSocket.on("getMessage", (data) => {
       const myId = (user._id || user.id)?.toString();
       const senderId = (data.senderId || data.sender)?._id || (data.senderId || data.sender);
       if (senderId?.toString() === myId) return;
 
-      const isCurrentChat = activeChatRef.current && 
-        data.conversationId && 
-        activeChatRef.current.toString() === data.conversationId.toString();
+      const convoIdStr = (data.conversationId?._id || data.conversationId)?.toString();
+
+      setLastIncomingMessage({
+        ...data,
+        conversationId: convoIdStr,
+        senderId: senderId?.toString()
+      });
+
+      const isCurrentChat = activeChatRef.current &&
+        convoIdStr &&
+        activeChatRef.current.toString() === convoIdStr;
 
       if (isCurrentChat) {
-        // Automatically mark as read if currently open in view
-        API.put(`/chats/conversations/${data.conversationId}/read`).catch(console.error);
+        if (convoIdStr) {
+          API.put(`/chats/conversations/${convoIdStr}/read`).catch(console.error);
+        }
       } else {
-        // Increment pending counts
         setUnreadCount((prev) => prev + 1);
-        if (data.conversationId) {
+        if (convoIdStr) {
           setUnreadPerConversation((prev) => ({
             ...prev,
-            [data.conversationId]: (prev[data.conversationId] || 0) + 1
+            [convoIdStr]: (prev[convoIdStr] || 0) + 1
           }));
         }
       }
@@ -96,20 +107,22 @@ export const ChatProvider = ({ children }) => {
       clearInterval(interval);
       newSocket.disconnect();
       socketRef.current = null;
+      setSocket(null);
     };
   }, [token, user, fetchUnreadCount]);
 
   const markConversationAsRead = useCallback(async (conversationId) => {
     if (!conversationId) return;
+    const convoIdStr = (conversationId?._id || conversationId)?.toString();
     try {
-      await API.put(`/chats/conversations/${conversationId}/read`);
-      
+      await API.put(`/chats/conversations/${convoIdStr}/read`);
+
       setUnreadPerConversation((prev) => {
-        const currentConvoUnread = prev[conversationId] || 0;
+        const currentConvoUnread = prev[convoIdStr] || 0;
         setUnreadCount((total) => Math.max(0, total - currentConvoUnread));
         return {
           ...prev,
-          [conversationId]: 0
+          [convoIdStr]: 0
         };
       });
     } catch (err) {
@@ -122,9 +135,11 @@ export const ChatProvider = ({ children }) => {
       value={{
         unreadCount,
         unreadPerConversation,
-        onlineUsers,
-        socket: socketRef.current,
+        socket,
         socketRef,
+        lastIncomingMessage,
+        resetInboxTrigger,
+        resetInbox,
         activeConversationId,
         setActiveConversationId,
         markConversationAsRead,
@@ -136,3 +151,4 @@ export const ChatProvider = ({ children }) => {
     </ChatContext.Provider>
   );
 };
+

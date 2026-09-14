@@ -5,7 +5,7 @@ import { ChatContext } from "../context/ChatContext";
 
 const LeftSidebar = () => {
   const { user } = useContext(AuthContext);
-  const { unreadCount } = useContext(ChatContext);
+  const { unreadCount, resetInbox } = useContext(ChatContext);
   const location = useLocation();
 
   const links = [
@@ -81,17 +81,21 @@ const LeftSidebar = () => {
     <aside className="hidden lg:flex flex-col w-[240px] shrink-0 pt-24 pb-8 px-4 fixed left-0 top-0 h-screen">
       <div className="flex flex-col gap-1">
         {links.map(({ to, label, icon, badge }) => {
-          const isActive = location.pathname === to || 
+          const isActive = location.pathname === to ||
             (to.startsWith("/profile") && location.pathname.startsWith("/profile"));
           return (
             <Link
               key={to}
               to={to}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-[15px] font-medium ${
-                isActive 
-                  ? "bg-blue-50 dark:bg-blue-950/30 text-blue-600" 
+              onClick={() => {
+                if (to === "/messenger") {
+                  resetInbox();
+                }
+              }}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-[15px] font-medium ${isActive
+                  ? "bg-blue-50 dark:bg-blue-950/30 text-blue-600"
                   : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-white"
-              }`}
+                }`}
             >
               {icon(isActive)}
               <span className="flex-1">{label}</span>
