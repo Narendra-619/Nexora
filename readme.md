@@ -1,11 +1,12 @@
 # Nexora
 
-> An Instagram-style MERN social media platform with a full GitOps CI/CD pipeline running on AWS EKS.
+> A comprehensive MERN social media platform with a full GitOps CI/CD pipeline running on AWS EKS, alongside a lightweight Render deployment.
 
-Nexora is a full-stack social application built with React 19, Express 5, and MongoDB Atlas. It ships real-time chat over Socket.IO, a follow/private-account graph, scheduled posting with a server-side cron, saved-post collections, in-app notifications, per-post analytics, and a multi-device session model backed by server-stored, SHA-256-hashed, rotating refresh tokens. The backend runs on a self-managed EKS cluster (provisioned with Terraform) with images built by Jenkins and deployed via ArgoCD in a pure GitOps flow.
+Nexora is a full-stack social application built with React 19, Express 5, and MongoDB Atlas. It ships real-time chat over Socket.IO, a follow/private-account graph, scheduled posting with a server-side cron, saved-post collections, in-app notifications, per-post analytics, and a multi-device session model backed by server-stored, SHA-256-hashed, rotating refresh tokens. The backend is deployed in dual environments: a lightweight Render deployment and a self-managed EKS cluster (provisioned with Terraform) with images built by Jenkins and deployed via ArgoCD in a pure GitOps flow.
 
-**Live frontend:** [https://socialapp-kura.vercel.app/](https://socialapp-kura.vercel.app/)  
-**Backend:** AWS EKS (ap-south-1) — exposed via ALB Ingress (previously Render)
+**Live frontend:** [https://socialapp-kura.vercel.app/](https://socialapp-kura.vercel.app/) (Vercel)  
+**Render backend:** Render  
+**EKS backend:** AWS EKS (ap-south-1) — exposed via ALB Ingress
 
 ---
 
@@ -28,9 +29,9 @@ Nexora is a full-stack social application built with React 19, Express 5, and Mo
 
 ## 1. Project Overview
 
-Nexora is an Instagram-style MERN social media application. Users can post text, images, and videos; follow each other; send direct messages in real time; bookmark content into named collections; schedule posts for future publication; and receive granular in-app notifications.
+Nexora is a MERN social media application. Users can post text, images, and videos; follow each other; send direct messages in real time; bookmark content into named collections; schedule posts for future publication; and receive granular in-app notifications.
 
-The backend has migrated from Render (free tier) to a self-managed AWS EKS cluster, giving the project production-grade infrastructure: Horizontal Pod Autoscaling, Kubernetes NetworkPolicies, ALB Ingress with path-based routing, OIDC/IRSA for the AWS Load Balancer Controller, and a Jenkins to ArgoCD GitOps pipeline. MongoDB Atlas is retained as the managed database rather than migrating to RDS/DocumentDB, because the application is built on Mongoose and Atlas provides the same cloud-managed convenience without a schema migration.
+The backend is deployed across two environments: a lightweight deployment on Render and a production-grade deployment on a self-managed AWS EKS cluster. The EKS environment features Horizontal Pod Autoscaling, Kubernetes NetworkPolicies, ALB Ingress with path-based routing, OIDC/IRSA for the AWS Load Balancer Controller, and a Jenkins to ArgoCD GitOps pipeline. MongoDB Atlas is retained as the managed database rather than migrating to RDS/DocumentDB, because the application is built on Mongoose and Atlas provides the same cloud-managed convenience without a schema migration.
 
 ---
 
