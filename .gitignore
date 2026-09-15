@@ -7,3 +7,4 @@ SocialAppCredentials.txt
 .terraform/
 *.tfstate
 *.tfstate.*
+.terraform.lock.hcl

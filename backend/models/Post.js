@@ -58,10 +58,14 @@ const postSchema = new mongoose.Schema({
   comments: [commentSchema],
   status: {
     type: String,
-    enum: ["draft", "scheduled", "published"],
+    enum: ["draft", "scheduled", "publishing", "published"],
     default: "published"
   },
   scheduledAt: {
+    type: Date,
+    default: null
+  },
+  claimedAt: {
     type: Date,
     default: null
   }
